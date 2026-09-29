@@ -70,7 +70,8 @@ typedef int error_t;
 #include <hurd/fs.h>
 #include <hurd/trivfs.h>
 #include <mach/mach.h>
-#include <mach/mach_msg.h>
+#include <mach/port.h>
+#include <mach/message.h>
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
