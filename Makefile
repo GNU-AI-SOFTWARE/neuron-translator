@@ -10,30 +10,35 @@ SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
-# System detection: Detect if we can link Hurd libraries
-# On GNU/Hurd: uname -s returns "GNU"
-# On Linux: uname -s returns "Linux"
-# We always compile; we only link on Hurd where libraries exist
-UNAME := $(shell uname -s | head -n1 | tr -d '\n')
+# This Makefile compiles the sigmoid neuron translator for GNU/Hurd
+# On any system: 'make' compiles the object files
+# On GNU/Hurd: 'make link' or 'make install' performs full build with linking
+# Note: Hurd libraries are only available on GNU/Hurd systems
 
-# Hurd libraries - only available on GNU/Hurd
-LIBS = -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+# Compiler and flags
+CC = gcc
+CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
+LDFLAGS =
+TARGET = sigmoid-neuron-translator
+SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
+OBJS = $(SRCS:.c=.o)
+INCLUDES = -Iinclude
 
-# Primary target: always compile
+# Default target: compile only (works on all systems)
 all: compile
 
 compile: $(OBJS)
 	@echo "Compilation successful. All .o files generated."
+	@echo "On GNU/Hurd, use 'make link' to build the executable."
 
-# Secondary target: link only on Hurd
+# Linking target (requires Hurd libraries)
+link: $(TARGET)
+
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
 
-# On Hurd systems, also make the executable when running 'make'
-ifeq ($(UNAME),GNU)
-all: $(TARGET)
-endif
+INSTALL_DIR = /hurd
 
 INSTALL_DIR = /hurd
 
