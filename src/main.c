@@ -54,7 +54,11 @@ int main(void)
     /* If it is called, it means we're not running as a translator */
 #ifdef __MACH__
     /* On Hurd, if main() is called, it's an error */
-    fprintf(stderr, "[ERROR] main() called on Hurd system - translator should use trivfs_demuxer entry point!\n");
+    /* Print to both stderr and stdout for visibility in settrans context */
+    fprintf(stderr, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
+    fprintf(stdout, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
+    fflush(stderr);
+    fflush(stdout);
     return EXIT_FAILURE;
 #else
     /* On non-Hurd systems (like Debian/Linux), display helpful message */

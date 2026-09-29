@@ -435,6 +435,14 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
  */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
+    /* This is the actual entry point for the translator on GNU/Hurd */
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
+    fprintf(stdout, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
+    fflush(stderr);
+    fflush(stdout);
+#endif
+    
     /* Delegate to the trivfs server message handler */
     /* trivfs_server expects mach_msg_header_t (pointer), not mach_msg_header_t * (pointer to pointer) */
     return trivfs_server(*inmsg, *outmsg);
