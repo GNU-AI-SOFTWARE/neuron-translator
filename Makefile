@@ -19,14 +19,21 @@ TARGET = sigmoid-neuron-translator
 # On Hurd: uname -s = GNU, and /usr/lib/libtrivfs* exists
 # On Linux: uname -s = Linux
 
-# Check if this is a Hurd system
-HURD_SYSTEM := $(shell uname -s 2>/dev/null | grep -q GNU && echo yes || echo no)
+# Check if this is a Hurd system (uname -s returns "GNU" on Hurd)
+UNAME_S := $(shell uname -s 2>/dev/null)
+HURD_SYSTEM := $(shell echo "$(UNAME_S)" | grep -q GNU && echo yes || echo no)
+
+# Debug: Show which system we detected
+$(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 
 # On Hurd systems, exclude main.c as filesystem translators use trivfs_demuxer, not main()
+# On non-Hurd systems, include main.c for testing
 ifeq ($(HURD_SYSTEM),yes)
 SRCS = src/neuron.c src/trivfs-hooks.c
+$(info Building for GNU/Hurd - excluding main.c)
 else
 SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
+$(info Building for $(UNAME_S) - including main.c)
 endif
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
@@ -43,7 +50,10 @@ executable: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
+	# On Hurd, translators must have trivfs_demuxer as entry point, not _start/main
+	# Without this, ld will look for main() and fail
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
 
 INSTALL_DIR = /hurd
 
@@ -65,6 +75,19 @@ uninstall:
 
 clean:
 	rm -f $(TARGET) $(OBJS) *~ *.o
+
+# Minimal test translator - for debugging
+minimal: src/translator-minimal.o
+
+src/translator-minimal.o: src/translator-minimal.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+minimal-translator: src/translator-minimal.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -ltrivfs -lfshelp -lports -lshouldbeinlibc
+
+install-minimal: minimal-translator
+	install -m 755 minimal-translator /hurd/
+	@echo "Minimal translator installed to /hurd/minimal-translator"
 
 help:
 	@echo "LLM Sigmoid Neuron Translator for GNU Hurd - Modular Version"
