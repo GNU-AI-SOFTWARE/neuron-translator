@@ -39,8 +39,10 @@
  * 
  * Initializes the global network and starts the trivfs server loop.
  * This function is called by the Hurd system when the translator is loaded.
+ * On non-Hurd systems (like Debian/Linux), this will run in a limited mode
+ * or display an informative message.
  * 
- * @return Exit code (should not return for a translator)
+ * @return Exit code (should not return for a translator on Hurd)
  */
 int main(void)
 {
@@ -70,5 +72,28 @@ int main(void)
     fs_write = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t, size_t))fs_write_hook;
     
     /* Start the trivfs server loop - this should not return */
-    return trivfs_server_loop();
+    /* On non-Hurd systems, trivfs_server_loop returns -1 */
+    int result = trivfs_server_loop();
+    
+    /* If trivfs_server_loop returns (which it shouldn't on Hurd),
+       it means we're not on a Hurd system */
+    if (result != 0) {
+        /* Not running on GNU/Hurd - display helpful message */
+        fprintf(stderr, "\n" 
+                "===========================================================\n" 
+                "  This is a GNU/Hurd translator.\n" 
+                "  It must be run on a GNU/Hurd system, not on Debian/Linux.\n" 
+                "\n" 
+                "  To use this translator:\n" 
+                "  1. Install on GNU/Hurd: make executable\n" 
+                "  2. Set as translator: sudo settrans -c /llm /hurd/sigmoid-neuron-translator\n" 
+                "  3. Access: cat /llm\n" 
+                "\n" 
+                "  On Debian/Linux, you can only compile with: make\n" 
+                "  The translator will not function without GNU/Hurd.\n" 
+                "===========================================================\n");
+        return EXIT_FAILURE;
+    }
+    
+    return result;
 }
