@@ -4,8 +4,7 @@
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -std=c23 -Wall -Wextra -pedantic -O3 -march=native \
-	-D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
+CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 LDFLAGS = 
 
 # Target executable name
@@ -18,16 +17,18 @@ SRC = sigmoid-neuron-translator.c
 INSTALL_DIR = /hurd
 
 # Detect if we're on Hurd or Linux
+# On Hurd: uname -s returns "GNU"
+# On Linux: uname -s returns "Linux"
 UNAME := $(shell uname -s)
+
+# On Hurd, link with Hurd libraries. On Linux, only link with math and pthread.
 ifeq ($(UNAME),GNU)
-# We are on GNU/Hurd
 HURD_LIBS = -ltrivfs -lhurdfs -lports -lshouldbeinlibc
 else
-# We are on GNU/Linux or other - use stub implementations
 HURD_LIBS =
 endif
 
-# Libraries (common + Hurd-specific)
+# Libraries
 LIBS = -lm -lpthread $(HURD_LIBS)
 
 # Default target
@@ -42,15 +43,13 @@ install: $(TARGET)
 ifeq ($(UNAME),GNU)
 	install -m 755 $(TARGET) $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)/$(TARGET)"
-	@echo ""
 	@echo "To use the translator:"
-	@echo "  1. Create mount point: sudo mkdir -p /llm"
-	@echo "  2. Set translator: sudo settrans -c /llm $(INSTALL_DIR)/$(TARGET)"
-	@echo "  3. Test it: cat /llm"
-	@echo "  4. Configure: echo '5,10,5' > /llm"
-	@echo "  5. Provide input: echo '0.5,0.3,0.8,0.1,0.9' > /llm"
+	@echo "  sudo mkdir -p /llm"
+	@echo "  sudo settrans -c /llm $(INSTALL_DIR)/$(TARGET)"
+	@echo "  cat /llm"
 else
-	@echo "Install target is for GNU/Hurd only. On Linux, just run: ./$(TARGET)"
+	@echo "This target is for GNU/Hurd only."
+	@echo "On Linux, just run: ./$(TARGET)"
 endif
 
 # Uninstall the translator
@@ -59,32 +58,30 @@ ifeq ($(UNAME),GNU)
 	rm -f $(INSTALL_DIR)/$(TARGET)
 	@echo "Removed from $(INSTALL_DIR)/"
 else
-	@echo "Uninstall target is for GNU/Hurd only"
+	@echo "This target is for GNU/Hurd only."
 endif
 
 # Clean build artifacts
 clean:
 	rm -f $(TARGET) *~ *.o
 
-# Build and install (Hurd only)
-build-install: clean all install
-
 # Show usage
 help:
 	@echo "LLM Sigmoid Neuron Translator for GNU Hurd"
+	@echo "==========================================="
 	@echo ""
 	@echo "Targets:"
-	@echo "  make          - Build the translator"
-	@echo "  make install  - Install to $(INSTALL_DIR)/ (Hurd only)"
+	@echo "  make all       - Build the translator"
+	@echo "  make install   - Install to $(INSTALL_DIR)/ (Hurd only)"
 	@echo "  make uninstall - Remove from $(INSTALL_DIR)/ (Hurd only)"
-	@echo "  make clean    - Clean build artifacts"
-	@echo "  make help     - Show this help"
+	@echo "  make clean     - Clean build artifacts"
+	@echo "  make help      - Show this help"
 	@echo ""
 	@echo "On GNU/Hurd:"
-	@echo "  After installing, set translator with:"
+	@echo "  make && sudo make install"
 	@echo "  sudo settrans -c /llm /hurd/sigmoid-neuron-translator"
 	@echo ""
 	@echo "On GNU/Linux (test mode):"
-	@echo "  Just run: ./sigmoid-neuron-translator"
+	@echo "  make && ./sigmoid-neuron-translator"
 
-.PHONY: all install uninstall clean help build-install
+.PHONY: all install uninstall clean help

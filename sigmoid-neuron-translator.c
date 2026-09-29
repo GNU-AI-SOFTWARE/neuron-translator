@@ -61,11 +61,6 @@
  *                                                                           *
  *****************************************************************************/
 
-/*
- * Standard C headers
- * We define _GNU_SOURCE to get POSIX extensions on GNU systems
- * and _POSIX_C_SOURCE to ensure POSIX compliance
- */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -74,15 +69,14 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
-#include <stdio.h>      /* Standard I/O operations */
-#include <stdlib.h>     /* Memory allocation, exit() */
-#include <string.h>     /* memcpy(), memset(), strerror() */
-#include <math.h>       /* expf(), mathematical functions */
-#include <errno.h>      /* Error number definitions */
-#include <stdint.h>     /* Fixed-width integer types */
-#include <stdbool.h>    /* Boolean type and values */
-#include <stddef.h>     /* NULL, size_t, ptrdiff_t */
-#include <stdalign.h>   /* alignas, alignof for C23 alignment */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 
 /*****************************************************************************
@@ -91,66 +85,48 @@
  *                                                                           *
  *****************************************************************************/
 
-/*
- * We need to handle differences between GNU/Hurd and GNU/Linux
- * 
- * On Hurd: __GNU__ is defined, __linux__ is NOT defined
- * On Linux: __linux__ is defined
- */
-
 #if defined(__GNU__) && !defined(__linux__)
-/* We are on GNU/Hurd */
-# define ON_HURD 1
+#define ON_HURD 1
 #else
-/* We are on GNU/Linux or other */
-# define ON_HURD 0
+#define ON_HURD 0
 #endif
 
 
-/*
- * Define error_t for compatibility
- * On Hurd, this is defined in hurd.h, but we provide it for Linux
- */
+/* Define error_t for compatibility */
 #ifndef __error_t_defined
-# define __error_t_defined 1
+#define __error_t_defined 1
 typedef int error_t;
 #endif
 
 
-/*
- * Hurd-specific headers and types
- */
 #if ON_HURD
-# include <pthread.h>    /* POSIX threads for Hurd compatibility */
-# include <hurd.h>       /* GNU Hurd basic definitions */
-# include <hurd/fs.h>    /* Filesystem interface */
-# include <hurd/trivfs.h>/* Trivial filesystem implementation */
-# include <mach/mach.h>
 
-/* Define MACH_PORT_NULL if not already defined */
+/* On Hurd, include the real headers */
+#include <pthread.h>
+#include <hurd.h>
+#include <hurd/fs.h>
+#include <hurd/trivfs.h>
+#include <mach/mach.h>
+#include <mach/mach_msg.h>
+
 #ifndef MACH_PORT_NULL
-# define MACH_PORT_NULL 0
+#define MACH_PORT_NULL 0
 #endif
 
 #else /* !ON_HURD */
 
-/* On Linux, provide stubs for Hurd-specific types */
+/* On Linux, provide stubs */
 #include <pthread.h>
 
-/* Mach port type stub */
 typedef unsigned int mach_port_t;
-
-/* Mach message header stub */
 typedef struct mach_msg_header *mach_msg_header_t;
 
-/* Trivfs types stubs */
 struct iouser;
 struct node;
 struct iobuf;
 
-/* Define MACH_PORT_NULL for Linux */
 #ifndef MACH_PORT_NULL
-# define MACH_PORT_NULL 0
+#define MACH_PORT_NULL 0
 #endif
 
 #endif /* ON_HURD */
@@ -162,26 +138,15 @@ struct iobuf;
  *                                                                           *
  *****************************************************************************/
 
-/*
- * Network Topology Limits
- */
 #define MAX_LAYERS 8
 #define MAX_NEURONS_PER_LAYER 8192
 #define SIMD_ALIGNMENT 16
 
-
-/*
- * Neuron Constants (biologically plausible values)
- */
 #define RESET_POTENTIAL (-80.0f)
 #define THRESHOLD (-55.0f)
 #define LEAK_RATE 0.1f
 #define REFRACTORY_LENGTH 5
 
-
-/*
- * Default Network Topology
- */
 #define DEFAULT_LAYER_SIZES {10, 20, 5}
 #define DEFAULT_LAYER_COUNT 3
 
@@ -192,7 +157,6 @@ struct iobuf;
  *                                                                           *
  *****************************************************************************/
 
-/* Network Topology */
 typedef struct NetworkTopology {
     uint8_t layer_count;
     uint16_t layer_sizes[MAX_LAYERS];
@@ -206,7 +170,6 @@ typedef struct NetworkTopology {
 } NetworkTopology;
 
 
-/* Compact Neural Network */
 typedef struct CompactNeuralNetwork {
     NetworkTopology topology;
     size_t total_neurons;
@@ -229,7 +192,6 @@ typedef struct CompactNeuralNetwork {
 } CompactNeuralNetwork;
 
 
-/* Global network instance */
 static CompactNeuralNetwork global_network = {0};
 
 
@@ -241,30 +203,21 @@ static CompactNeuralNetwork global_network = {0};
 
 #if ON_HURD
 
-/* Extern declarations for trivfs variables */
+/* External declarations from trivfs */
 extern mach_port_t trivfs_control;
 extern char *fs_help;
-extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
-                           struct iobuf **);
-extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
-                           size_t);
-extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
-                            size_t);
+extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *, struct iobuf **);
+extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *, size_t);
+extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
-/* Extern declarations for trivfs functions */
+/* External functions from trivfs */
 extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
 extern int trivfs_server_loop(void);
-extern error_t trivfs_startup(mach_port_t, int, struct port_class *,
-                                struct port_bucket *, struct port_class *,
-                                struct port_bucket *, struct trivfs_control **);
 
 /* Forward declarations for our hooks */
-static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *,
-                           struct iobuf **);
-static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *,
-                           size_t);
-static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t,
-                            size_t);
+static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *, struct iobuf **);
+static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
+static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
 #endif /* ON_HURD */
 
@@ -275,26 +228,10 @@ static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t,
  *                                                                           *
  *****************************************************************************/
 
-/*
- * sigmoidf - Sigmoid activation function (float version)
- * f(x) = 1 / (1 + e^(-x))
- */
 static inline float
 sigmoidf(float x)
 {
     return 1.0f / (1.0f + expf(-x));
-}
-
-
-/*
- * sigmoidf_derivative - Derivative of sigmoid function
- * f'(x) = sigmoid(x) * (1 - sigmoid(x))
- */
-static inline float
-sigmoidf_derivative(float x)
-{
-    float s = sigmoidf(x);
-    return s * (1.0f - s);
 }
 
 
@@ -304,9 +241,6 @@ sigmoidf_derivative(float x)
  *                                                                           *
  *****************************************************************************/
 
-/*
- * aligned_malloc - Allocate aligned memory
- */
 static void *
 aligned_malloc(size_t size, size_t alignment)
 {
@@ -318,9 +252,6 @@ aligned_malloc(size_t size, size_t alignment)
 }
 
 
-/*
- * aligned_free - Free aligned memory
- */
 static void
 aligned_free(void *ptr)
 {
@@ -334,9 +265,6 @@ aligned_free(void *ptr)
  *                                                                           *
  *****************************************************************************/
 
-/*
- * network_init - Initialize a neural network with given topology
- */
 static int
 network_init(CompactNeuralNetwork *net,
              uint8_t layer_count,
@@ -420,16 +348,12 @@ network_init(CompactNeuralNetwork *net,
     char *ptr = (char *)net->memory_block;
     net->voltages = (float *)ptr;
     ptr += voltages_size;
-    
     net->weights = (float *)ptr;
     ptr += weights_size;
-    
     net->biases = (float *)ptr;
     ptr += biases_size;
-    
     net->input_buffer = (float *)ptr;
     ptr += input_size;
-    
     net->output_buffer = (float *)ptr;
     
     for (size_t i = 0; i < net->total_neurons; i++) {
@@ -455,7 +379,6 @@ network_init(CompactNeuralNetwork *net,
 }
 
 
-/* network_free - Free neural network memory */
 static void
 network_free(CompactNeuralNetwork *net)
 {
@@ -476,28 +399,12 @@ network_free(CompactNeuralNetwork *net)
 }
 
 
-/* network_reset - Reset network state */
-static void
-network_reset(CompactNeuralNetwork *net)
-{
-    if (!net || !net->initialized) {
-        return;
-    }
-    for (size_t i = 0; i < net->total_neurons; i++) {
-        net->voltages[i] = net->topology.reset_potential;
-    }
-    net->forward_pass_count = 0;
-    net->neuron_activations = 0;
-}
-
-
 /*****************************************************************************
  *                                                                           *
  *                        FORWARD PASS FUNCTION                              *
  *                                                                           *
  *****************************************************************************/
 
-/* network_forward - Perform a forward pass through the network */
 static void
 network_forward(CompactNeuralNetwork *net)
 {
@@ -554,7 +461,6 @@ network_forward(CompactNeuralNetwork *net)
  *                                                                           *
  *****************************************************************************/
 
-/* parse_config_string - Parse a configuration string into layer sizes */
 static int
 parse_config_string(const char *config_str, uint16_t *layer_sizes, int max_layers)
 {
@@ -596,7 +502,6 @@ parse_config_string(const char *config_str, uint16_t *layer_sizes, int max_layer
 }
 
 
-/* parse_input_string - Parse an input string into the input buffer */
 static bool
 parse_input_string(CompactNeuralNetwork *net, const char *input_str)
 {
@@ -640,7 +545,6 @@ parse_input_string(CompactNeuralNetwork *net, const char *input_str)
 
 #if ON_HURD
 
-/* fs_open_hook - Handle file open requests */
 static error_t
 fs_open_hook(struct iouser *cred, int flags, mode_t mode, struct node *node,
              struct iobuf **iobuf)
@@ -657,7 +561,6 @@ fs_open_hook(struct iouser *cred, int flags, mode_t mode, struct node *node,
 }
 
 
-/* fs_read_hook - Handle file read requests */
 static error_t
 fs_read_hook(struct iouser *cred, struct iobuf *iobuf, off_t offset,
              size_t *len, size_t count)
@@ -686,62 +589,25 @@ fs_read_hook(struct iouser *cred, struct iobuf *iobuf, off_t offset,
                           "  Layer %d: %d neurons\n",
                           i, global_network.topology.layer_sizes[i]);
     }
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "\n");
+    written += snprintf(buffer + written, sizeof(buffer) - written, "\n");
     
     written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "Neuron Parameters:\n");
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Reset potential: %.2f mV\n",
-                       global_network.topology.reset_potential);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Threshold: %.2f mV\n",
-                       global_network.topology.threshold);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Leak rate: %.2f\n",
-                       global_network.topology.leak_rate);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Refractory length: %d\n\n",
-                       global_network.topology.refractory_length);
-    
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "Memory Usage:\n");
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Total memory: %.2f KB\n",
-                       (double)global_network.memory_block_size / 1024.0);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Neurons: %zu\n",
-                       global_network.total_neurons);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Weights: %zu\n",
+                       "Memory: %.2f KB, Neurons: %zu, Weights: %zu\n\n",
+                       (double)global_network.memory_block_size / 1024.0,
+                       global_network.total_neurons,
                        global_network.total_weights);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Biases: %zu\n\n",
-                       global_network.total_biases);
     
     written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "Statistics:\n");
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Forward passes: %zu\n",
-                       global_network.forward_pass_count);
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  Neuron activations: %zu\n\n",
-                       global_network.neuron_activations);
-    
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "Current Output:\n");
-    
+                       "Output:\n");
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
         written += snprintf(buffer + written, sizeof(buffer) - written,
                           "  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
     }
     
     written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "\nUsage:\n");
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  To reconfigure: echo '<layers>' > /llm\n");
-    written += snprintf(buffer + written, sizeof(buffer) - written,
-                       "  To provide input: echo '<values>' > /llm\n");
+                       "\nUsage:\n"
+                       "  Configure: echo '<layers>' > /llm\n"
+                       "  Input: echo '<values>' > /llm\n");
     
     if (written >= sizeof(buffer)) {
         written = sizeof(buffer) - 1;
@@ -763,7 +629,6 @@ fs_read_hook(struct iouser *cred, struct iobuf *iobuf, off_t offset,
 }
 
 
-/* fs_write_hook - Handle file write requests */
 static error_t
 fs_write_hook(struct iouser *cred, struct iobuf *iobuf, off_t offset,
               size_t len, size_t count)
@@ -805,15 +670,13 @@ fs_write_hook(struct iouser *cred, struct iobuf *iobuf, off_t offset,
 }
 
 
-/* trivfs_demuxer - Message demultiplexer for trivfs */
-error_t
+int
 trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     return trivfs_server(inmsg, outmsg);
 }
 
 
-/* main - Translator entry point for Hurd */
 int
 main(int argc, char **argv)
 {
@@ -828,7 +691,6 @@ main(int argc, char **argv)
     network_init(&global_network, DEFAULT_LAYER_COUNT, layers);
     
     fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
-              "Memory-efficient, CPU-optimized neural network\n"
               "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
     
     fs_open = fs_open_hook;
@@ -847,7 +709,6 @@ main(int argc, char **argv)
  *                                                                           *
  *****************************************************************************/
 
-/* main - Test mode for Linux */
 int
 main(int argc, char **argv)
 {
@@ -856,7 +717,6 @@ main(int argc, char **argv)
     printf("LLM Sigmoid Neuron Translator - Test Mode (Linux)\n");
     printf("===================================================\n\n");
     
-    /* Initialize network */
     uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
     if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
         fprintf(stderr, "Failed to initialize network: %s\n", strerror(errno));
@@ -869,64 +729,37 @@ main(int argc, char **argv)
     }
     printf("\n");
     
-    /* Set some test input */
     for (int i = 0; i < global_network.topology.input_size; i++) {
         global_network.input_buffer[i] = (float)i * 0.1f;
     }
     
-    /* Run forward pass */
     network_forward(&global_network);
     
-    /* Print output */
     printf("Forward pass completed\n");
     printf("Output:\n");
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
         printf("  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
     }
     
-    printf("\nStatistics:\n");
-    printf("  Forward passes: %zu\n", global_network.forward_pass_count);
-    printf("  Neuron activations: %zu\n", global_network.neuron_activations);
-    printf("  Memory used: %.2f KB\n", 
-           (double)global_network.memory_block_size / 1024.0);
+    printf("\nMemory: %.2f KB, Neurons: %zu, Weights: %zu\n",
+           (double)global_network.memory_block_size / 1024.0,
+           global_network.total_neurons,
+           global_network.total_weights);
     
-    /* Test configuration parsing */
-    printf("\nTesting configuration parsing...\n");
     uint16_t test_layers[MAX_LAYERS];
     int test_count = parse_config_string("5,10,5", test_layers, MAX_LAYERS);
     if (test_count > 0) {
-        printf("Parsed configuration: ");
-        for (int i = 0; i < test_count; i++) {
-            printf("%d", test_layers[i]);
-            if (i < test_count - 1) printf(", ");
-        }
-        printf("\n");
+        printf("Config parsing works: %d layers\n", test_count);
     }
     
-    /* Test input parsing */
-    printf("\nTesting input parsing...\n");
     if (parse_input_string(&global_network, "0.5,0.3,0.8,0.1,0.9,0.2,0.4,0.6,0.0,0.7")) {
-        printf("Input parsed and forward pass executed\n");
-        printf("New output:\n");
-        for (size_t i = 0; i < global_network.topology.output_size; i++) {
-            printf("  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
-        }
+        printf("Input parsing and forward pass works\n");
     }
     
-    /* Clean up */
     network_free(&global_network);
-    
     printf("\nTest mode completed successfully\n");
-    printf("On GNU/Hurd, compile with Hurd headers to get full translator functionality\n");
     
     return 0;
 }
 
 #endif /* ON_HURD */
-
-
-/*
- * Editor modelines
- * vim: set ts=8 sw=4 sts=4 tw=78 expandtab:
- * Emacs: -*- mode: c; tab-width: 8; c-basic-offset: 4; -*- 
- */
