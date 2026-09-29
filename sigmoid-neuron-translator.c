@@ -126,7 +126,6 @@ typedef int error_t;
 # include <hurd/fs.h>    /* Filesystem interface */
 # include <hurd/trivfs.h>/* Trivial filesystem implementation */
 # include <mach/mach.h>
-# include <mach/mach_msg.h>
 
 /* Define MACH_PORT_NULL if not already defined */
 #ifndef MACH_PORT_NULL
