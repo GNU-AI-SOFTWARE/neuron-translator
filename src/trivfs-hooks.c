@@ -24,15 +24,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Include Hurd headers only when on Hurd */
-#ifdef ON_HURD
-#include <hurd.h>
-#include <hurd/trivfs.h>
-#endif
-
+/* Include our headers - trivfs-hooks.h will include Hurd headers if ON_HURD */
 #include "neuron.h"
-#include "trivfs-hooks.h"
 #include "debug.h"
+#include "trivfs-hooks.h"
 
 
 /*****************************************************************************
