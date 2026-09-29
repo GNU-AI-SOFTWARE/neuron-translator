@@ -16,48 +16,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- * ============================================================================
- * 
- * OVERVIEW:
- * 
- * This is a memory-efficient, CPU-optimized sigmoid neuron translator for
- * GNU Hurd. It implements a compact neural network with contiguous memory
- * allocation, designed to load thousands of neurons with minimal overhead.
- * 
- * This file is designed to compile on both GNU/Hurd and GNU/Linux systems.
- * On Hurd, it functions as a full trivfs translator. On Linux, it provides
- * a test mode that simulates the translator behavior.
- * 
- * Key Features:
- *   - Sigmoid activation function for LLM-style neurons
- *   - Contiguous memory layout for cache efficiency
- *   - SIMD-aligned allocations
- *   - Low memory footprint (single malloc for all network data)
- *   - Low CPU usage (optimized forward pass)
- *   - Full GNU Hurd trivfs translator integration (when on Hurd)
- *   - POSIX compliant
- *   - C23 standard compliant
- * 
- * USAGE ON HURD:
- *   1. Compile: make
- *   2. Install: sudo make install
- *   3. Set translator: sudo settrans -c /llm /hurd/sigmoid-neuron-translator
- *   4. Read: cat /llm
- *   5. Write input: echo "0.5,0.3,0.8" > /llm
- *
- * USAGE ON LINUX (test mode):
- *   1. Compile: make
- *   2. Run: ./sigmoid-neuron-translator
- *   3. This will run a simple test of the neural network
- *
- * ============================================================================
  */
 
 
 /*****************************************************************************
  *                                                                           *
- *                      INCLUDE DIRECTIVES AND DEFINITIONS                    *
+ *                         INCLUDE DIRECTIVES                                 *
  *                                                                           *
  *****************************************************************************/
 
@@ -69,6 +33,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
+/* Standard C library headers */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,12 +45,11 @@
 #include <pthread.h>
 
 
-/*****************************************************************************
- *                                                                           *
- *                    PORTABILITY: HURD vs LINUX                             *
- *                                                                           *
- *****************************************************************************/
-
+/*
+ * Portability: Detect if we are on GNU/Hurd or GNU/Linux
+ * On Hurd: __GNU__ is defined, __linux__ is NOT defined
+ * On Linux: __linux__ is defined
+ */
 #if defined(__GNU__) && !defined(__linux__)
 #define ON_HURD 1
 #else
@@ -100,34 +64,27 @@ typedef int error_t;
 #endif
 
 
+/* Hurd-specific headers */
 #if ON_HURD
-
-/* On Hurd, include the real headers */
 #include <hurd.h>
 #include <hurd/fs.h>
 #include <hurd/trivfs.h>
 #include <mach/mach.h>
 #include <mach/mach_msg.h>
-
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
-
-#else /* !ON_HURD */
-
-/* On Linux, provide stubs */
+#else
+/* On Linux, provide stubs for Hurd types */
 typedef unsigned int mach_port_t;
 typedef struct mach_msg_header *mach_msg_header_t;
-
 struct iouser;
 struct node;
 struct iobuf;
-
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
-
-#endif /* ON_HURD */
+#endif
 
 
 /*****************************************************************************
@@ -201,21 +158,24 @@ static CompactNeuralNetwork global_network = {0};
 
 #if ON_HURD
 
-/* External declarations from trivfs */
 extern mach_port_t trivfs_control;
 extern char *fs_help;
-extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *, struct iobuf **);
-extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *, size_t);
-extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t, size_t);
+extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
+                           struct iobuf **);
+extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
+                           size_t);
+extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
+                            size_t);
 
-/* External functions from trivfs */
 extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
 extern int trivfs_server_loop(void);
 
-/* Forward declarations for our hooks */
-static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *, struct iobuf **);
-static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
-static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t, size_t);
+static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *,
+                           struct iobuf **);
+static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *,
+                           size_t);
+static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t,
+                            size_t);
 
 #endif /* ON_HURD */
 
@@ -761,3 +721,8 @@ main(int argc, char **argv)
 }
 
 #endif /* ON_HURD */
+
+
+/*
+ * Editor modelines
+ */
