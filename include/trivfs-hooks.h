@@ -13,10 +13,13 @@
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
  *
- *  This header provides a self-contained interface for the sigmoid neuron
- *  translator. It declares all necessary Hurd types and symbols explicitly
- *  to ensure compilation works even when Hurd headers are not available
- *  during development. It follows Claude Delannoy's educational style.
+ *  This header provides the interface between the neural network implementation
+ *  and the GNU Hurd trivfs translator system. It follows Claude Delannoy's
+ *  educational style with clear, maintainable code.
+ *
+ *  Note: We include minimal system headers here and declare only what's
+ *  necessary. User code must include <hurd/trivfs.h> and <hurd/iohelp.h>
+ *  to get the actual Hurd implementations.
  */
 
 #ifndef TRIVFS_HOOKS_H
@@ -25,77 +28,72 @@
 
 /*****************************************************************************
  *                                                                           *
- *                        FORWARD DECLARATIONS                               *
+ *                    MINIMAL SYSTEM HEADERS INCLUSION                       *
+ *                                                                           *
+ *  We include only what we absolutely need to declare our interface.        *
+ *  POSIX types are included here; Hurd types are declared externally.     *
  *                                                                           *
  *****************************************************************************/
 
-/* Hurd I/O structures - forward declarations */
+/* POSIX types */
+#include <sys/types.h>  /* For mode_t, off_t, size_t */
+
+/* Our neural network types */
+#include "neuron.h"
+
+
+/*****************************************************************************
+ *                                                                           *
+ *                    FORWARD DECLARATIONS FOR HURD TYPES                    *
+ *                                                                           *
+ *  These are forward declarations. The actual definitions come from     *
+ *  Hurd headers which must be included by user code (main.c).             *
+ *                                                                           *
+ *****************************************************************************/
+
+/* Hurd I/O structures */
 struct iobuf;
 struct node;
 struct iouser;
 
-/* Mach types - forward declarations */
+/* Mach message type */
 struct mach_msg_header_t;
 typedef struct mach_msg_header_t *mach_msg_header_t;
 
-/* Hurd error type */
-typedef int error_t;
-
-/* Mach port type */
-typedef unsigned int mach_port_t;
-
 
 /*****************************************************************************
  *                                                                           *
- *                        CONSTANTS AND MACROS                               *
+ *                    EXTERNAL DECLARATIONS                                  *
+ *                                                                           *
+ *  These symbols are declared in Hurd headers. We declare them here       *
+ *  explicitly to ensure they are visible. User code must include           *
+ *  <hurd/trivfs.h>, <hurd/iohelp.h>, <mach/mach.h> for the actual        *
+ *  implementations.                                                      *
  *                                                                           *
  *****************************************************************************/
 
-/* Mach port null value */
-#define MACH_PORT_NULL ((mach_port_t) 0)
-
-
-/*****************************************************************************
- *                                                                           *
- *                    POSIX TYPES (from sys/types.h)                         *
- *                                                                           *
- *****************************************************************************/
-
-#include <sys/types.h>  /* For mode_t, off_t, size_t */
-
-
-/*****************************************************************************
- *                                                                           *
- *                    HURD TRIVFS INTERFACE                                 *
- *                                                                           *
- *  Explicit declarations of all Hurd trivfs symbols we need.             *
- *  These match the declarations in <hurd/trivfs.h> and <hurd/iohelp.h>.   *
- *                                                                           *
- *****************************************************************************/
-
-/* Translator control port */
+/* From <hurd/trivfs.h> */
 extern mach_port_t trivfs_control;
-
-/* Help text for the translator */
 extern char *fs_help;
-
-/* Filesystem hook function pointers */
 extern error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct iobuf **);
 extern error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
 extern error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
-/* Server functions */
+/* From <mach/mach.h> */
+#ifndef MACH_PORT_NULL
+#define MACH_PORT_NULL ((mach_port_t) 0)
+#endif
+
+/* From <hurd/trivfs.h> */
 extern error_t trivfs_server(mach_msg_header_t, mach_msg_header_t);
 extern int trivfs_server_loop(void);
 
 
 /*****************************************************************************
  *                                                                           *
- *                         NEURAL NETWORK INSTANCE                          *
+ *                         GLOBAL NETWORK INSTANCE                          *
  *                                                                           *
  *****************************************************************************/
-
-#include "neuron.h"
 
 /** Global network instance - defined in src/trivfs-hooks.c */
 extern CompactNeuralNetwork global_network;

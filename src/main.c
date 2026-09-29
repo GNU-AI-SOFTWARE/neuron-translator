@@ -24,6 +24,11 @@
 #include <string.h>
 #include <errno.h>  /* For errno */
 
+/* Hurd and Mach headers must be included before our trivfs-hooks.h */
+#include <hurd/trivfs.h>    /* For fs_open, fs_read, fs_write, trivfs_control, fs_help */
+#include <hurd/iohelp.h>    /* For struct iobuf, struct node, struct iouser */
+#include <mach/mach.h>      /* For mach_port_t, MACH_PORT_NULL */
+
 #include "neuron.h"
 #include "trivfs-hooks.h"
 
