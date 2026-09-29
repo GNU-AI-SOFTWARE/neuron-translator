@@ -12,36 +12,27 @@ INCLUDES = -Iinclude
 
 # System detection for library selection
 # On GNU/Hurd, these libraries are available and required
-# On other systems (Debian/Linux), they may not be available
+# On Debian/Linux, they are not available
 UNAME := $(shell uname -s | tr -d '\n')
 
-# Hurd libraries - only link on GNU/Hurd systems
+# Hurd libraries - only used on GNU/Hurd systems
 # Standard Hurd libraries: libtrivfs, libfshelp, libports, libshouldbeinlibc
-# Note: libhurdfs does NOT exist in standard GNU/Hurd - it was likely a confusion
-#       with the Hurd File System. We use the correct standard libraries instead.
-# On Debian/Linux, use 'make compile' to only compile without linking.
 ifeq ($(UNAME),Linux)
-    # On Linux, we can only compile the object files without linking
-    # The full build requires Hurd libraries which are not available
+    # On Linux, we only compile - no linking
     LIBS =
+    all: compile
+    compile: $(OBJS)
+	    @echo "Compilation successful. All .o files generated."
 else
-    # On GNU/Hurd or other systems, use Hurd libraries
-    # Standard Hurd libraries: trivfs, fshelp, ports, shouldbeinlibc
+    # On GNU/Hurd, use Hurd libraries
     LIBS = -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+    all: $(TARGET)
+    $(TARGET): $(OBJS)
+	    @echo "Linking with Hurd libraries..."
+	    $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 endif
 
 INSTALL_DIR = /hurd
-
-# On Linux, 'all' just compiles without linking (no Hurd libraries)
-# On Hurd, 'all' does full build with linking
-ifeq ($(UNAME),Linux)
-all: compile
-else
-all: $(TARGET)
-$(TARGET): $(OBJS)
-	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
-endif
 
 # Compile-only target for systems without Hurd libraries (e.g., Debian)
 compile: $(OBJS)
