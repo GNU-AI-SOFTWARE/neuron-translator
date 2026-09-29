@@ -18,13 +18,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-/*****************************************************************************
- *                                                                           *
- *                         INCLUDE DIRECTIVES                                 *
- *                                                                           *
- *****************************************************************************/
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -44,23 +37,18 @@
 #include <stddef.h>
 #include <pthread.h>
 
-
-/*
- * Portability: Detect if we are on GNU/Hurd or GNU/Linux
- * On Hurd: __GNU__ is defined, __linux__ is NOT defined
- * On Linux: __linux__ is defined
- */
-#if defined(__GNU__) && !defined(__linux__)
-#define ON_HURD 1
-#else
-#define ON_HURD 0
-#endif
-
-
 /* Define error_t for compatibility */
 #ifndef __error_t_defined
 #define __error_t_defined 1
 typedef int error_t;
+#endif
+
+
+/* Portability: Detect if we are on GNU/Hurd or GNU/Linux */
+#if defined(__GNU__) && !defined(__linux__)
+#define ON_HURD 1
+#else
+#define ON_HURD 0
 #endif
 
 
