@@ -1,3 +1,12 @@
+/* Define feature test macros BEFORE any includes */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 /*
  * sigmoid-neuron-translator.c - LLM Sigmoid Neuron Translator for GNU Hurd
  *
@@ -26,14 +35,6 @@
  *  C23 Standard, POSIX compliant headers for GNU Hurd                        *
  *                                                                           *
  *****************************************************************************/
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L
-#endif
 
 /* Standard C library headers */
 #include <stdio.h>      /* Standard I/O functions */
