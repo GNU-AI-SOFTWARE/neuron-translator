@@ -17,14 +17,14 @@
  *  It follows GNU Hurd translator conventions and provides the interface
  *  between the neural network implementation and the Hurd filesystem.
  *
- *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational
+ *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Include our headers - trivfs-hooks.h will include Hurd headers if ON_HURD */
+/* Include our headers - trivfs-hooks.h handles Hurd/system includes */
 #include "neuron.h"
 #include "debug.h"
 #include "trivfs-hooks.h"
@@ -32,39 +32,45 @@
 
 /*****************************************************************************
  *                                                                           *
- *              HURD DETECTION                                               *
+ *              FALLBACK DEFINITIONS FOR NON-HURD SYSTEMS                   *
  *                                                                           *
- *  On GNU/Hurd, we use the standard __GNU__ macro defined by gcc.         *
- *  This is the primary detection method.                                   *
+ *  These are only needed when compiling on non-Hurd systems (Linux, etc.) *
+ *  On Hurd, these types are provided by system headers.                 *
  *                                                                           *
  *****************************************************************************/
 
 #ifndef ON_HURD
-/* STUB implementations for non-Hurd systems */
 
-/* Stub for trivfs_server_loop - only used on GNU/Hurd */
+/* Mach types - fallback for non-Hurd systems */
+typedef unsigned int mach_port_t;
+#define MACH_PORT_NULL ((mach_port_t) 0)
+
+/* Forward declarations for Hurd types */
+struct iouser;
+struct node;
+
+/* I/O buffer structure - used for read/write operations in translators */
+struct iobuf {
+    char *buf;              /* Pointer to the actual buffer data */
+    size_t buf_size;        /* Size of the buffer */
+    off_t offset;           /* Current offset within the buffer */
+};
+
+/* Server loop function - stub for non-Hurd */
 int trivfs_server_loop(void) {
-    /* On non-Hurd systems, this function should never be called */
-    /* Return error to indicate translator cannot run without Hurd */
     log_debug_message("[DEBUG] trivfs_server_loop: STUB called - not on Hurd!");
     return -1;
 }
 
-/* Stub for trivfs_server - only used on GNU/Hurd */
+/* Server message handler - stub for non-Hurd */
 error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
-    (void)inmsg;  /* Unused parameter */
-    (void)outmsg; /* Unused parameter */
-    /* On non-Hurd systems, this function should never be called */
+    (void)inmsg;
+    (void)outmsg;
     log_debug_message("[DEBUG] trivfs_server: STUB called - not on Hurd!");
     return -1;
 }
 
-#else
-/* On Hurd, these are provided by libtrivfs - declare them as extern */
-extern int trivfs_server_loop(void);
-extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
-
-#endif
+#endif /* ON_HURD */
 
 
 /*****************************************************************************
@@ -84,10 +90,6 @@ CompactNeuralNetwork global_network = {0};
  *  These variables are declared as extern in trivfs-hooks.h and must be   *
  *  defined here for the linker to find them.                               *
  *                                                                           *
- *  Note: On GNU/Hurd, the trivfs library uses weak symbols for fs_open,   *
- *  fs_read, fs_write. We define our own implementations below that        *
- *  delegate to our hook functions.                                         *
- *                                                                           *
  *****************************************************************************/
 
 /* Translator control port */
@@ -100,19 +102,9 @@ char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
 
 /*****************************************************************************
  *                                                                           *
- *                    DEBUG LOGGING HELPER FUNCTION                         *
+ *                    TRIVFS HOOK IMPLEMENTATIONS                         *
  *                                                                           *
- *  Defined in include/debug.h                                                *
- *                                                                           *
- *****************************************************************************/
-
-
-/*****************************************************************************
- *                                                                           *
- *                 ACTUAL TRIVFS FUNCTION IMPLEMENTATIONS                 *
- *                                                                           *
- *  These are the functions that the trivfs library will call directly.    *
- *  They use weak symbols, so our definitions override the defaults.      *
+ *  These override the default trivfs implementations via weak symbols.    *
  *                                                                           *
  *****************************************************************************/
 
@@ -181,11 +173,8 @@ static void __attribute__((constructor)) translator_init(void)
     /* Set trivfs control port to null */
     trivfs_control = MACH_PORT_NULL;
     
-    /* Debug: Indicate initialization - try multiple locations */
-    /* This runs before main() so if this doesn't execute, the binary isn't even loaded */
-#ifdef DEBUG
+    /* Debug: Indicate initialization */
     log_debug_message("[DEBUG] Sigmoid Neuron Translator: Constructor ran");
-#endif
 }
 
 
@@ -201,7 +190,7 @@ static void __attribute__((constructor)) translator_init(void)
  * fs_open_hook - Called when translator node is opened
  * 
  * Initializes the network. This is called by the Hurd system when the
- * translator node is opened, not by main() (which is never called for translators).
+ * translator node is opened.
  */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf)
@@ -211,22 +200,12 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     (void)mode;     /* Unused parameter */
     (void)node;     /* Unused parameter */
     
-#ifdef DEBUG
-    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] fs_open_hook called\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] fs_open_hook called\n");
-#endif
+    log_debug_message("[DEBUG] fs_open_hook called");
     
     *iobuf = NULL;  /* No I/O buffer needed for this translator */
     
     /* Initialize network if not already done */
-    /* Note: main() is never called for Hurd translators, so we must initialize here */
     if (!global_network.initialized) {
-        /* Initialize with default topology */
         uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
         if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
             return EIO;  /* Initialization failed */
@@ -249,15 +228,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)offset;   /* Unused parameter */
     (void)count;    /* Unused parameter */
     
-#ifdef DEBUG
-    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
-#endif
+    log_debug_message("[DEBUG] fs_read_hook called, initialized=%d", global_network.initialized);
     
     /* Network should already be initialized by fs_open_hook */
     if (!global_network.initialized) {
@@ -267,7 +238,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     /* Build output buffer with network information */
     char buffer[4096];
     size_t written = 0;
-    int snprintf_result;  /* Renamed to avoid redeclaration */
+    int snprintf_result;
     
     /* Title and separator */
     snprintf_result = snprintf(buffer, sizeof(buffer),
@@ -388,7 +359,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return EINVAL;
     }
     
-    /* Network should already be initialized by main() */
+    /* Network should already be initialized */
     if (!global_network.initialized) {
         return EIO;  /* Network not initialized - should not happen */
     }
@@ -408,7 +379,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
     if (newline) *newline = '\0';
     
     /* Handle special commands */
-    /* Check for "reset" command - must be exactly "reset" or "reset" followed by separator */
+    /* Check for "reset" command */
     if (strlen(temp) >= 5 && strncmp(temp, "reset", 5) == 0) {
         if (temp[5] == '\0' || temp[5] == ' ' || temp[5] == '\t') {
             network_reset(&global_network);
@@ -460,19 +431,21 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 }
 
 
+/*****************************************************************************
+ *                                                                           *
+ *                      TRIVFS DEMUXER - ENTRY POINT                        *
+ *                                                                           *
+ *  On GNU/Hurd, this is the REAL entry point called by the Hurd filesystem.*
+ *  On other systems, this is a stub.                                    *
+ *                                                                           *
+ *****************************************************************************/
+
 /**
  * trivfs_demuxer - Message demultiplexer
  * 
  * This function is the entry point for all Mach IPC messages received by the
  * translator. It demultiplexes messages and dispatches them to the
  * appropriate trivfs server function.
- * 
- * On GNU/Hurd, this is the REAL entry point called by the Hurd filesystem system.
- * On other systems, this is a stub that will never be called.
- * 
- * @param inmsg  Pointer to the incoming Mach message header
- * @param outmsg Pointer to the outgoing Mach message header
- * @return       Error code from message processing (0 on success)
  */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {

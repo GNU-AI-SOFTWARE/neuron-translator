@@ -13,10 +13,10 @@
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
  *
- *  This header declares the translator-specific functions and variables.
- *  On GNU/Hurd, it uses system types from <hurd/trivfs.h>.
- *  On other systems, it provides minimal fallback declarations.
- *  It follows Claude Delannoy's educational style with POSIX and C23 standards.
+ *  This header declares the translator-specific interface.
+ *  On GNU/Hurd: uses system types from <hurd/trivfs.h>.
+ *  On other systems: provides opaque forward declarations.
+ *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  */
 
 #ifndef TRIVFS_HOOKS_H
@@ -49,13 +49,13 @@
  *                                                                           *
  *                    MACH/HURD TYPES                                       *
  *                                                                           *
- *  On Hurd systems, use system headers. On other systems, provide minimal   *
- *  forward declarations for compilation.                                   *
+ *  On Hurd: use system headers that define all necessary types.            *
+ *  On other systems: provide minimal forward declarations.                 *
  *                                                                           *
  *****************************************************************************/
 
 #if defined(ON_HURD)
-/* On Hurd, include system headers - they define all necessary types */
+/* On Hurd, include system headers - they define everything we need */
 #include <mach.h>
 #include <mach/port.h>
 #include <mach/message.h>
@@ -71,15 +71,10 @@ typedef unsigned int mach_port_t;
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
 
-/* Hurd types */
+/* Hurd types - declare as opaque (pointer only) */
 struct iouser;
 struct node;
-
-struct iobuf {
-    char *buf;
-    size_t buf_size;
-    off_t offset;
-};
+struct iobuf;
 
 /* error_t is in errno.h */
 
@@ -90,16 +85,13 @@ struct iobuf {
  *                                                                           *
  *                    FUNCTION DECLARATIONS                                 *
  *                                                                           *
- *  On Hurd, trivfs_server_loop and trivfs_server are in libtrivfs        *
+ *  On Hurd: trivfs_server_loop and trivfs_server are in libtrivfs.        *
  *                                                                           *
  *****************************************************************************/
 
 #ifndef ON_HURD
 /* On non-Hurd systems, provide stub declarations */
-/* Server loop function */
 extern int trivfs_server_loop(void);
-
-/* Server message handler */
 extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
 #endif
 
