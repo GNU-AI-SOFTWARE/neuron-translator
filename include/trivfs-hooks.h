@@ -15,68 +15,45 @@
  *
  *  This header declares the trivfs hooks and external variables for the
  *  sigmoid neuron translator. It follows GNU Hurd translator conventions.
+ *
+ *  Note: All Hurd variables and functions (fs_open, fs_read, fs_write,
+ *  trivfs_control, fs_help, trivfs_server, trivfs_server_loop) are
+ *  declared in <hurd/trivfs.h> and should not be redeclared here.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
+#include <sys/types.h>  /* For mode_t, off_t, size_t */
 #include <hurd.h>
-#include <hurd/trivfs.h>
-#include <hurd/iohelp.h>
+#include <hurd/trivfs.h>      /* Provides: fs_open, fs_read, fs_write, trivfs_control, fs_help */
+#include <hurd/iohelp.h>      /* Provides: struct iobuf, struct node, struct iouser */
 
 #include <mach/mach.h>
 #include <mach/port.h>
 #include <mach/message.h>
 
+#include "neuron.h"  /* For CompactNeuralNetwork type */
+
 
 /*****************************************************************************
  *                                                                           *
- *                         EXTERNAL VARIABLES                                *
- *                                                                           *
- *  Variables declared by the Hurd trivfs library                            *
+ *                         GLOBAL NETWORK INSTANCE                          *
  *                                                                           *
  *****************************************************************************/
 
-/** Mach port for translator control */
-extern mach_port_t trivfs_control;
-
-/** Help text for the translator */
-extern char *fs_help;
-
-/** Filesystem open hook */
-extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
-                           struct iobuf **);
-
-/** Filesystem read hook */
-extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
-                           size_t);
-
-/** Filesystem write hook */
-extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
-                            size_t);
+/* Global network instance - defined in src/trivfs-hooks.c */
+extern CompactNeuralNetwork global_network;
 
 
 /*****************************************************************************
  *                                                                           *
  *                      FUNCTION DECLARATIONS                              *
  *                                                                           *
+ *  Note: Function signatures must exactly match those in <hurd/trivfs.h>  *
+ *        to ensure type compatibility when assigning to fs_open, fs_read, etc.*
+ *                                                                           *
  *****************************************************************************/
-
-/**
- * @brief Hurd trivfs server function
- * 
- * @param inmsg  Incoming Mach message header
- * @param outmsg Outgoing Mach message header
- * @return       Error code
- */
-extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
-
-/**
- * @brief Hurd trivfs server loop
- * 
- * @return Exit code
- */
-extern int trivfs_server_loop(void);
 
 /**
  * @brief Translator message demultiplexer
@@ -89,50 +66,14 @@ extern int trivfs_server_loop(void);
  */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/**
- * @brief Open hook for translator node
- * 
- * Called when the translator node is opened.
- * 
- * @param cred  User credentials
- * @param flags File open flags
- * @param mode  File creation mode
- * @param node  Filesystem node
- * @param iobuf Output: I/O buffer
- * @return      Error code (0 on success)
- */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
+/** Open hook - signature must match fs_open from <hurd/trivfs.h> */
+error_t fs_open_hook(struct iouser *, int, mode_t, struct node *, struct iobuf **);
 
-/**
- * @brief Read hook for translator node
- * 
- * Called when the translator node is read from.
- * 
- * @param cred   User credentials
- * @param iobuf  I/O buffer
- * @param offset Read offset
- * @param len    Output: number of bytes read
- * @param count  Maximum bytes to read
- * @return       Error code (0 on success)
- */
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
+/** Read hook - signature must match fs_read from <hurd/trivfs.h> */
+error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
 
-/**
- * @brief Write hook for translator node
- * 
- * Called when data is written to the translator node.
- * 
- * @param cred   User credentials
- * @param iobuf  I/O buffer
- * @param offset Write offset
- * @param len    Number of bytes to write
- * @param count  Reserved (unused)
- * @return       Error code (0 on success)
- */
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
+/** Write hook - signature must match fs_write from <hurd/trivfs.h> */
+error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
 
 #endif /* TRIVFS_HOOKS_H */
