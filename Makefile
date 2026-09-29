@@ -9,7 +9,14 @@ TARGET = sigmoid-neuron-translator
 SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
+
+# Hurd libraries - available on GNU/Hurd systems
+# On GNU/Hurd: -ltrivfs -lhurdfs -lports -lshouldbeinlibc
+# These libraries are part of the Hurd system and should be present when
+# compiling on a Hurd system. On Debian, you may need to install
+# hurd development packages or cross-compile for Hurd.
 LIBS = -lm -lpthread -ltrivfs -lhurdfs -lports -lshouldbeinlibc
+
 INSTALL_DIR = /hurd
 
 all: $(TARGET)

@@ -22,15 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Hurd I/O structures - we need at least the members we access */
-struct node;
-struct iouser;
-
-/* struct iobuf - we access ->buf member, so declare it */
-struct iobuf {
-    char *buf;  /* Buffer pointer - this is the member we access */
-};
-
 #include "neuron.h"
 #include "trivfs-hooks.h"
 
@@ -43,6 +34,27 @@ struct iobuf {
 
 /** Global network instance shared across all translator operations */
 CompactNeuralNetwork global_network = {0};
+
+
+/*****************************************************************************
+ *                                                                           *
+ *                    TRANSLATOR GLOBAL VARIABLES                            *
+ *                                                                           *
+ *  These variables are declared as extern in trivfs-hooks.h and must be   *
+ *  defined here for the linker to find them.                               *
+ *                                                                           *
+ *****************************************************************************/
+
+/* Translator control port */
+mach_port_t trivfs_control = MACH_PORT_NULL;
+
+/* Help text for the translator */
+char *fs_help = NULL;
+
+/* Filesystem hook function pointers */
+error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct iobuf **) = NULL;
+error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t) = NULL;
+error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t) = NULL;
 
 
 /*****************************************************************************
