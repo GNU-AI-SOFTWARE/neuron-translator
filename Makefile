@@ -10,18 +10,42 @@ SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
-# Hurd libraries - available on GNU/Hurd systems
-# On GNU/Hurd: -ltrivfs -lhurdfs -lports -lshouldbeinlibc
-# These libraries are part of the Hurd system and should be present when
-# compiling on a Hurd system. On Debian, you may need to install
-# hurd development packages or cross-compile for Hurd.
-LIBS = -lm -lpthread -ltrivfs -lhurdfs -lports -lshouldbeinlibc
+# System detection for library selection
+# On GNU/Hurd, these libraries are available and required
+# On other systems (Debian/Linux), they may not be available
+UNAME := $(shell uname -s)
+
+# Hurd libraries - only link on GNU/Hurd systems
+# These libraries (-ltrivfs, -lhurdfs, -lports, -lshouldbeinlibc) are part of
+# the GNU/Hurd system and are required for the translator to function.
+# On Debian/Linux, use 'make compile' to only compile without linking.
+ifeq ($(UNAME),Linux)
+    # On Linux, we can only compile the object files without linking
+    # The full build requires Hurd libraries which are not available
+    LIBS =
+else
+    # On GNU/Hurd or other systems, use Hurd libraries
+    LIBS = -lm -lpthread -ltrivfs -lhurdfs -lports -lshouldbeinlibc
+endif
 
 INSTALL_DIR = /hurd
 
+# On Linux, 'all' just compiles without linking (no Hurd libraries)
+# On Hurd, 'all' does full build with linking
+ifeq ($(UNAME),Linux)
+all: compile
+else
 all: $(TARGET)
+endif
+
+# Compile-only target for systems without Hurd libraries (e.g., Debian)
+compile: $(OBJS)
+	@echo "Compilation successful. All .o files generated."
+	@echo "Note: On Debian/Linux, use 'make compile' or 'make' to compile without linking."
+	@echo "      On GNU/Hurd, use 'make' for full build with linking."
 
 $(TARGET): $(OBJS)
+	@echo "Linking with Hurd libraries..."
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 src/%.o: src/%.c
@@ -43,9 +67,13 @@ help:
 	@echo "LLM Sigmoid Neuron Translator for GNU Hurd - Modular Version"
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make          - Build the translator"
+	@echo "  make          - Build the translator (requires Hurd libraries)"
+	@echo "  make compile  - Compile only (no linking, for Debian/Linux)"
 	@echo "  make install  - Install to /hurd/"
 	@echo "  make uninstall - Remove from /hurd/"
 	@echo "  make clean    - Clean build artifacts"
+	@echo ""
+	@echo "Note: Full build with linking requires GNU/Hurd system or"
+	@echo "      Hurd development libraries. On Debian/Linux, use 'make compile'."
 
-.PHONY: all install uninstall clean help
+.PHONY: all install uninstall clean help compile
