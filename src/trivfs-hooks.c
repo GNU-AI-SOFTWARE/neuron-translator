@@ -22,10 +22,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Hurd I/O structures - forward declarations for use in this file */
-struct iobuf;
+/* Hurd I/O structures - we need at least the members we access */
 struct node;
 struct iouser;
+
+/* struct iobuf - we access ->buf member, so declare it */
+struct iobuf {
+    char *buf;  /* Buffer pointer - this is the member we access */
+};
 
 #include "neuron.h"
 #include "trivfs-hooks.h"
