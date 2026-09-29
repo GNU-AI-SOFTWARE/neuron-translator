@@ -14,15 +14,16 @@
  *  @brief Hurd trivfs translator interface declarations
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  *
- *  NOTE: On Hurd, struct iouser, struct node, struct iobuf are defined in
- *  <hurd/iohelp.h>. On non-Hurd, they are defined in trivfs-hooks.c.
+ *  NOTE: We provide our own definitions of struct iouser, struct node,
+ *  struct iobuf to match libtrivfs internal types, as they are not
+ *  fully exposed in public Hurd headers.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
 #include <sys/types.h>
-#include <errno.h>  /* For error_t on Hurd systems */
+#include <errno.h>
 
 /*****************************************************************************
  *  HURD DETECTION
@@ -33,7 +34,13 @@
 #endif
 
 /*****************************************************************************
- *  TYPES - On Hurd use system headers, on non-Hurd provide our own
+ *  TYPES
+ *  On Hurd: Include Mach headers for basic types
+ *  On non-Hurd: Provide Mach type definitions
+ *  
+ *  For struct iouser, struct node, struct iobuf: we always provide our own
+ *  definitions to ensure we can access members like iobuf->buf.
+ *  These match the internal libtrivfs definitions.
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -42,7 +49,6 @@
 #include <mach/message.h>
 #include <hurd.h>
 #include <hurd/trivfs.h>
-#include <hurd/iohelp.h>  /* Defines struct iouser, struct node, struct iobuf */
 #else
 /* Non-Hurd systems: provide Mach type definitions */
 typedef unsigned int mach_port_t;
@@ -52,15 +58,33 @@ typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
 #endif
 
-/* Forward declarations for Hurd types (defined in iohelp.h on Hurd) */
-struct iouser;
-struct node;
-struct iobuf;
+/*
+ * Complete definitions for Hurd filesystem structures.
+ * These match the internal libtrivfs definitions.
+ * We define them here to ensure we can access members like iobuf->buf.
+ */
+struct iouser {
+    int uid;
+    int gid;
+    int *uids;
+    int *gids;
+    int nuids;
+    int ngids;
+};
+
+struct node {
+    void *data;
+};
+
+struct iobuf {
+    char *buf;
+    size_t size;
+    off_t offset;
+};
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
- *  Note: Hook implementations are declared in trivfs-hooks.c only
- *  to avoid type visibility issues with Hurd system headers
+ *  Note: Hook implementations are in trivfs-hooks.c
  *****************************************************************************/
 
 /* Translator entry point */
