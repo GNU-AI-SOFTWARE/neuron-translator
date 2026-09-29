@@ -10,25 +10,29 @@ SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
-# System detection: On GNU/Hurd, build with linking; on Linux, compile only
+# System detection: Detect if we can link Hurd libraries
+# On GNU/Hurd: uname -s returns "GNU"
+# On Linux: uname -s returns "Linux"
+# We always compile; we only link on Hurd where libraries exist
 UNAME := $(shell uname -s | head -n1 | tr -d '\n')
 
-# Hurd libraries
+# Hurd libraries - only available on GNU/Hurd
 LIBS = -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
 
-# Default target: compile only
+# Primary target: always compile
 all: compile
 
 compile: $(OBJS)
 	@echo "Compilation successful. All .o files generated."
 
-# On GNU/Hurd, also provide full build target
-ifeq ($(UNAME),GNU)
-all: $(TARGET)
-
+# Secondary target: link only on Hurd
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+# On Hurd systems, also make the executable when running 'make'
+ifeq ($(UNAME),GNU)
+all: $(TARGET)
 endif
 
 INSTALL_DIR = /hurd
