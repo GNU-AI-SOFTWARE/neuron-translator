@@ -1117,7 +1117,22 @@ int main(int argc, char **argv)
     printf("\nMemory: %.2f KB\n",
            (double)global_network.memory_block_size / 1024.0);
     
-    printf("Test passed\n");
+    /* Test network reset */
+    network_reset(&global_network);
+    printf("Network reset test passed\n");
+    
+    /* Test save and load */
+    if (network_save(&global_network, "/tmp/test-network.bin")) {
+        printf("Network save test passed\n");
+        CompactNeuralNetwork test_net = {0};
+        if (network_load(&test_net, "/tmp/test-network.bin")) {
+            printf("Network load test passed\n");
+            network_free(&test_net);
+        }
+        remove("/tmp/test-network.bin");
+    }
+    
+    printf("\nAll tests passed\n");
     network_free(&global_network);
     
     return 0;
