@@ -20,14 +20,11 @@
 #include <string.h>
 
 /*****************************************************************************
- *  FALLBACK TYPES FOR NON-HURD SYSTEMS
- *  Must be defined BEFORE including trivfs-hooks.h on non-Hurd systems
+ *  NON-HURD TYPE DEFINITIONS
+ *  Must be defined BEFORE including headers on non-Hurd systems
  *****************************************************************************/
 
-#if !defined(ON_HURD)
-
-/* Check if we need to define Hurd types */
-#ifndef __HURD__
+#ifndef ON_HURD
 
 /* Mach types */
 typedef unsigned int mach_port_t;
@@ -36,27 +33,52 @@ struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
 
 /* Hurd types */
-struct iouser { int dummy; };
-struct node { int dummy; };
+struct iouser;
+struct node;
 struct iobuf {
     char *buf;
     size_t buf_size;
     off_t offset;
 };
-
-/* Error type */
 typedef int error_t;
 
-#endif /* !__HURD__ */
 #endif /* !ON_HURD */
 
 /*****************************************************************************
- *  NOW INCLUDE HEADERS
+ *  INCLUDE HEADERS
  *****************************************************************************/
 
 #include "neuron.h"
 #include "debug.h"
 #include "trivfs-hooks.h"
+
+/* Forward declarations for hook implementations */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
+
+
+/*****************************************************************************
+ *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
+ *****************************************************************************/
+
+#ifndef ON_HURD
+
+int trivfs_server_loop(void) {
+    log_debug_message("[DEBUG] trivfs_server_loop: STUB - not on Hurd!");
+    return -1;
+}
+
+error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
+    (void)inmsg; (void)outmsg;
+    log_debug_message("[DEBUG] trivfs_server: STUB - not on Hurd!");
+    return -1;
+}
+
+#endif /* !ON_HURD */
 
 
 /*****************************************************************************
@@ -67,26 +89,6 @@ CompactNeuralNetwork global_network = {0};
 mach_port_t trivfs_control = MACH_PORT_NULL;
 char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
                 "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
-
-
-/*****************************************************************************
- *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
- *****************************************************************************/
-
-#if !defined(ON_HURD)
-
-int trivfs_server_loop(void) {
-    log_debug_message("[DEBUG] trivfs_server_loop: STUB called - not on Hurd!");
-    return -1;
-}
-
-error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
-    (void)inmsg; (void)outmsg;
-    log_debug_message("[DEBUG] trivfs_server: STUB called - not on Hurd!");
-    return -1;
-}
-
-#endif /* !ON_HURD */
 
 
 /*****************************************************************************
@@ -104,22 +106,9 @@ static void __attribute__((constructor)) translator_init(void)
 
 
 /*****************************************************************************
- *  TRIVFS HOOKS
+ *  TRIVFS HOOKS - Delegate to our implementations
+ *  These override the default trivfs implementations via weak symbols
  *****************************************************************************/
-
-/* These functions override the default trivfs implementations */
-
-#ifndef ON_HURD
-/* On non-Hurd, we need to define these */
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node *node, struct iobuf **iobuf);
-
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-               off_t offset, size_t *len, size_t count);
-
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                off_t offset, size_t len, size_t count);
-#endif
 
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
                struct node *node, struct iobuf **iobuf)
@@ -151,6 +140,7 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf)
 {
     (void)cred; (void)flags; (void)mode; (void)node;
+    
     log_debug_message("[DEBUG] fs_open_hook called");
     *iobuf = NULL;
     
@@ -160,6 +150,7 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
             return EIO;
         }
     }
+    
     return 0;
 }
 
@@ -182,6 +173,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     size_t written = 0;
     int snprintf_result;
     
+    /* Build output */
     snprintf_result = snprintf(buffer, sizeof(buffer),
               "LLM Sigmoid Neuron Translator - GNU Hurd\n"
               "===========================================\n\n");
@@ -192,6 +184,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                      "Network: %d layers", global_network.topology.layer_count);
     if (snprintf_result < 0) return EIO;
     written += (size_t)snprintf_result;
+    
     for (uint8_t i = 0; i < global_network.topology.layer_count; i++) {
         snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                           ", %d", global_network.topology.layer_sizes[i]);
@@ -227,6 +220,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        "Output:\n");
     if (snprintf_result < 0) return EIO;
     written += (size_t)snprintf_result;
+    
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
         snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                           "  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
@@ -294,11 +288,13 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
     memcpy(temp, iobuf->buf, len);
     temp[len] = '\0';
     
+    /* Remove trailing newlines */
     char *newline = strchr(temp, '\n');
     if (newline) *newline = '\0';
     newline = strchr(temp, '\r');
     if (newline) *newline = '\0';
     
+    /* Handle commands */
     if (strlen(temp) >= 5 && strncmp(temp, "reset", 5) == 0) {
         if (temp[5] == '\0' || temp[5] == ' ' || temp[5] == '\t') {
             network_reset(&global_network);
@@ -326,6 +322,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return EINVAL;
     }
     
+    /* Parse topology */
     uint16_t layers[MAX_LAYERS];
     int layer_count = parse_config_string(temp, layers, MAX_LAYERS);
     
@@ -337,6 +334,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return 0;
     }
     
+    /* Parse input */
     if (parse_input_string(&global_network, temp)) {
         return 0;
     }
@@ -346,7 +344,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 
 
 /*****************************************************************************
- *  TRIVFS DEMUXER - Entry point
+ *  TRIVFS DEMUXER - Entry point for Hurd translator
  *****************************************************************************/
 
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
@@ -359,7 +357,7 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
     extern error_t trivfs_server(mach_msg_header_t, mach_msg_header_t);
     return trivfs_server(*inmsg, *outmsg);
 #else
-    log_debug_message("[DEBUG] trivfs_demuxer: STUB called - not on Hurd!");
-    return -1;  /* Use -1 instead of EOPNOTSUPP to avoid redefinition */
+    log_debug_message("[DEBUG] trivfs_demuxer: STUB - not on Hurd!");
+    return -1;
 #endif
 }

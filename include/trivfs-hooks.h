@@ -12,9 +12,6 @@
 
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
- *
- *  On GNU/Hurd: system headers define all types.
- *  On other systems: this header provides necessary declarations.
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  */
 
@@ -33,8 +30,8 @@
 #endif
 
 /*****************************************************************************
- *  TYPE DEFINITIONS
- *  On Hurd: use system types. On other systems: define them.
+ *  ON HURD: INCLUDE SYSTEM HEADERS THAT DEFINE EVERYTHING
+ *  On non-Hurd: provide minimal type declarations
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -44,24 +41,16 @@
 #include <hurd.h>
 #include <hurd/trivfs.h>
 #else
-/* Fallback type definitions for non-Hurd systems */
-
-/* Mach types */
+/* Minimal types for non-Hurd systems */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
-
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
-
-/* Hurd types */
 struct iouser;
 struct node;
 struct iobuf;
-
-/* Error type - error_t is typically int, but use actual errno values */
 typedef int error_t;
-
-#endif /* ON_HURD */
+#endif
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
@@ -70,7 +59,7 @@ typedef int error_t;
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/* Filesystem hooks */
+/* Filesystem hooks - override trivfs defaults */
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
                struct node *node, struct iobuf **iobuf);
 error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
@@ -78,26 +67,22 @@ error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
 error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
                 off_t offset, size_t len, size_t count);
 
-/* Hook implementations */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
-
-#ifndef ON_HURD
-/* Stub functions for non-Hurd */
-extern int trivfs_server_loop(void);
-extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
-#endif
-
 /*****************************************************************************
  *  GLOBAL VARIABLES
  *****************************************************************************/
 
 extern mach_port_t trivfs_control;
 extern char *fs_help;
+
+/*****************************************************************************
+ *  STUB FUNCTIONS FOR NON-HURD
+ *****************************************************************************/
+
+#ifndef ON_HURD
+/* Stub functions for non-Hurd systems */
+extern int trivfs_server_loop(void);
+extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
+#endif
 
 /*****************************************************************************
  *  NEURAL NETWORK
