@@ -71,27 +71,31 @@ int main(void)
     fs_read = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t *, size_t))fs_read_hook;
     fs_write = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t, size_t))fs_write_hook;
     
-    /* Start the trivfs server loop - this should not return */
-    /* On non-Hurd systems, trivfs_server_loop returns -1 */
+    /* Start the trivfs server loop - this should not return on Hurd */
+    /* On non-Hurd systems, trivfs_server_loop returns -1 (stub implementation) */
     int result = trivfs_server_loop();
     
     /* If trivfs_server_loop returns (which it shouldn't on Hurd),
        it means we're not on a Hurd system */
     if (result != 0) {
         /* Not running on GNU/Hurd - display helpful message */
-        fprintf(stderr, "\n" 
-                "===========================================================\n" 
-                "  This is a GNU/Hurd translator.\n" 
-                "  It must be run on a GNU/Hurd system, not on Debian/Linux.\n" 
-                "\n" 
-                "  To use this translator:\n" 
-                "  1. Install on GNU/Hurd: make executable\n" 
-                "  2. Set as translator: sudo settrans -c /llm /hurd/sigmoid-neuron-translator\n" 
-                "  3. Access: cat /llm\n" 
-                "\n" 
-                "  On Debian/Linux, you can only compile with: make\n" 
-                "  The translator will not function without GNU/Hurd.\n" 
-                "===========================================================\n");
+        printf("\n" 
+               "================================================================\n" 
+               "  LLM SIGMOID NEURON TRANSLATOR - GNU/Hurd\n" 
+               "================================================================\n\n" 
+               "  This is a GNU/Hurd filesystem translator.\n" 
+               "  It CANNOT run on Debian/Linux - it requires a GNU/Hurd system.\n\n" 
+               "  WHAT YOU CAN DO:\n\n" 
+               "  On Debian/Linux:\n" 
+               "    - Compile only:  make\n" 
+               "    - Test C23/POSIX: make\n\n" 
+               "  On GNU/Hurd:\n" 
+               "    1. Build:        make executable\n" 
+               "    2. Install:      sudo make install\n" 
+               "    3. Set:          sudo settrans -c /llm /hurd/sigmoid-neuron-translator\n" 
+               "    4. Use:          cat /llm\n\n" 
+               "  For more info: https://github.com/gnu-ai/neuron-translator\n" 
+               "================================================================\n");
         return EXIT_FAILURE;
     }
     
