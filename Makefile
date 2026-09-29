@@ -26,15 +26,12 @@ HURD_SYSTEM := $(shell echo "$(UNAME_S)" | grep -q GNU && echo yes || echo no)
 # Debug: Show which system we detected
 $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 
-# On Hurd systems, exclude main.c as filesystem translators use trivfs_demuxer, not main()
-# On non-Hurd systems, include main.c for testing
-ifeq ($(HURD_SYSTEM),yes)
-SRCS = src/neuron.c src/trivfs-hooks.c
-$(info Building for GNU/Hurd - excluding main.c)
-else
+# For Hurd translators, we need to include main.c but it should return immediately
+# The actual entry point for trivfs translators is trivfs_demuxer
+# libtrivfs will handle the startup, not main()
+# So we always include main.c but with proper Hurd detection inside
 SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
-$(info Building for $(UNAME_S) - including main.c)
-endif
+$(info Building with all source files - main.c will handle Hurd detection internally)
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
@@ -51,10 +48,9 @@ executable: $(TARGET)
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
 	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	# On Hurd, translators must NOT use standard startup files (which expect main())
-	# Use -nostartfiles to avoid Scrt1.o which calls main()
-	# And explicitly set entry point to trivfs_demuxer
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -nostartfiles -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
+	# Link with Hurd trivfs library which provides the real entry point handling
+	# On Hurd, libtrivfs will call trivfs_demuxer, not main()
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
 
 INSTALL_DIR = /hurd
 

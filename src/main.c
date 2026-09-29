@@ -51,12 +51,17 @@
  */
 int main(void)
 {
-    /* On GNU/Hurd, main() should never be called for translators */
-    /* If it is called, it means we're not running as a translator */
+    /* On GNU/Hurd, when loaded as a translator by settrans, main() is called
+     * by the Hurd trivfs library, but it should do nothing.
+     * The real work happens in trivfs_demuxer().
+     * We return 0 to indicate success, but the translator continues running
+     * via the trivfs message loop.
+     */
 #ifdef __MACH__
-    /* On Hurd, if main() is called, it's an error */
-    log_debug_message("[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!");
-    return EXIT_FAILURE;
+    /* On Hurd, main() is called by trivfs startup but should return immediately
+     * The trivfs library will handle the server loop via trivfs_demuxer */
+    log_debug_message("[DEBUG] main(): Called on Hurd - returning immediately, real work in trivfs_demuxer");
+    return 0;  /* Return success - trivfs will handle the rest */
 #else
     /* On non-Hurd systems (like Debian/Linux), display helpful message */
 #ifdef DEBUG
