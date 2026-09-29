@@ -71,6 +71,10 @@ typedef int error_t;
  *                                                                           *
  *                         HURD-SPECIFIC HEADERS                             *
  *                                                                           *
+ *  When compiling for GNU/Hurd, we include the Hurd and Mach headers.      *
+ *  When these headers are not available (e.g., cross-compiling), we     *
+ *  provide minimal stub type definitions to allow compilation.         *
+ *                                                                           *
  *****************************************************************************/
 
 #if ON_HURD
@@ -90,11 +94,52 @@ typedef int error_t;
 #define MACH_PORT_NULL 0
 #endif
 
-/* Forward declarations for trivfs types from Hurd headers */
-/* These are defined in the Hurd headers but we need to ensure visibility */
+/* If the Hurd headers don't define these types, provide fallback definitions */
+/* This handles cases where headers are missing or incomplete */
+#ifndef _HURD_TRIVFS_H
+/* trivfs.h should define struct iobuf, but if not, provide a minimal version */
+struct iobuf {
+    char *buf;              /* Buffer pointer */
+    size_t buf_size;        /* Buffer size */
+    off_t offset;           /* Current offset */
+};
+
+/* fs.h should define struct node, but if not, provide a minimal version */
+struct node {
+    void *data;             /* Node-specific data */
+};
+
+/* fs.h should define struct iouser, but if not, provide a minimal version */
+struct iouser {
+    int uid;                /* User ID */
+    int gid;                /* Group ID */
+};
+#endif /* _HURD_TRIVFS_H */
+
+#else
+/* When not on Hurd, provide stub type definitions for compatibility */
+/* These allow the code to compile on Linux for testing purposes */
+#ifndef __mach_port_t_defined
+#define __mach_port_t_defined 1
+typedef unsigned int mach_port_t;
+#endif
+
+#ifndef __mach_msg_header_t_defined
+#define __mach_msg_header_t_defined 1
+typedef struct mach_msg_header *mach_msg_header_t;
+#endif
+
+#ifndef MACH_PORT_NULL
+#define MACH_PORT_NULL 0
+#endif
+
+/* Stub definitions for Hurd filesystem types */
 struct iouser;      /* User credentials structure */
 struct node;        /* Filesystem node structure */
 struct iobuf;       /* I/O buffer structure */
+
+#endif /* ON_HURD */
+
 
 /* External trivfs variables declared in <hurd/trivfs.h> */
 extern mach_port_t trivfs_control;
