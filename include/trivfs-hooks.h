@@ -14,8 +14,8 @@
  *  @brief Complete Hurd trivfs interface for the sigmoid neuron translator
  *
  *  This header provides a self-contained interface that declares all necessary
- *  Hurd and Mach types and symbols. It allows compilation to work even when
- *  Hurd development headers are not available on the build system.
+ *  Hurd and Mach types and symbols. It includes system headers where available
+ *  and provides fallback declarations when needed.
  *
  *  This follows Claude Delannoy's educational style with extensive comments
  *  explaining each declaration. The design ensures POSIX and C23 compliance.
@@ -27,18 +27,26 @@
 
 /*****************************************************************************
  *                                                                           *
- *                        POSIX TYPES                                        *
+ *                        SYSTEM HEADERS                                    *
  *                                                                           *
  *****************************************************************************/
 
-#include <sys/types.h>  /* For mode_t, off_t, size_t */
+/* POSIX error and type headers */
+#include <errno.h>   /* For errno and error_t (typedef enum __error_t_codes) */
+#include <sys/types.h> /* For mode_t, off_t, size_t */
 
 
 /*****************************************************************************
  *                                                                           *
  *                    MACH TYPES (from <mach/mach.h>)                        *
  *                                                                           *
+ *  These declarations are provided here for systems where Mach headers       *
+ *  are not available. If Mach headers are present, they will override these. *
+ *                                                                           *
  *****************************************************************************/
+
+#ifndef __MACH_MACH_H__
+/* Only declare if Mach headers are not already included */
 
 /* Mach message header type */
 struct mach_msg_header;
@@ -50,6 +58,8 @@ typedef unsigned int mach_port_t;
 /* Mach port null value */
 #define MACH_PORT_NULL ((mach_port_t) 0)
 
+#endif /* __MACH_MACH_H__ */
+
 
 /*****************************************************************************
  *                                                                           *
@@ -57,13 +67,15 @@ typedef unsigned int mach_port_t;
  *                                                                           *
  *****************************************************************************/
 
+#ifndef __HURD_IOHELP_H__
+/* Only declare if Hurd headers are not already included */
+
 /* Hurd I/O structures */
 struct iobuf;
 struct node;
 struct iouser;
 
-/* Hurd error type */
-typedef int error_t;
+#endif /* __HURD_IOHELP_H__ */
 
 
 /*****************************************************************************
@@ -71,6 +83,9 @@ typedef int error_t;
  *                    HURD VARIABLES (from <hurd/trivfs.h>)                  *
  *                                                                           *
  *****************************************************************************/
+
+#ifndef __HURD_TRIVFS_H__
+/* Only declare if Hurd trivfs headers are not already included */
 
 /* Translator control port */
 extern mach_port_t trivfs_control;
@@ -83,16 +98,11 @@ extern error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct io
 extern error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
 extern error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
-
-/*****************************************************************************
- *                                                                           *
- *                    HURD FUNCTIONS (from <hurd/trivfs.h>)                   *
- *                                                                           *
- *****************************************************************************/
-
 /* Server functions */
 extern error_t trivfs_server(mach_msg_header_t, mach_msg_header_t);
 extern int trivfs_server_loop(void);
+
+#endif /* __HURD_TRIVFS_H__ */
 
 
 /*****************************************************************************
@@ -117,7 +127,6 @@ extern CompactNeuralNetwork global_network;
  * @brief Translator message demultiplexer
  *
  * This function handles all Mach IPC messages for the translator.
- * Signature matches the declaration in Hurd's trivfs.h.
  *
  * @param inmsg  Incoming Mach message header (pointer)
  * @param outmsg Outgoing Mach message header (pointer)
@@ -129,7 +138,6 @@ int trivfs_demuxer(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
  * @brief Open hook for translator node
  *
  * Called when the translator node is opened.
- * Signature matches the fs_open hook from Hurd's trivfs.h.
  *
  * @param cred  User credentials
  * @param flags File open flags
@@ -145,7 +153,6 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
  * @brief Read hook for translator node
  *
  * Called when the translator node is read from.
- * Signature matches the fs_read hook from Hurd's trivfs.h.
  *
  * @param cred   User credentials
  * @param iobuf  I/O buffer
@@ -161,7 +168,6 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
  * @brief Write hook for translator node
  *
  * Called when data is written to the translator node.
- * Signature matches the fs_write hook from Hurd's trivfs.h.
  *
  * @param cred   User credentials
  * @param iobuf  I/O buffer
