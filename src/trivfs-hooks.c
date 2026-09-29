@@ -93,7 +93,8 @@ error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t) = NU
 /**
  * fs_open_hook - Called when translator node is opened
  * 
- * Initializes the network if not already done.
+ * Initializes the network. This is called by the Hurd system when the
+ * translator node is opened, not by main() (which is never called for translators).
  */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf)
@@ -105,9 +106,14 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     
     *iobuf = NULL;  /* No I/O buffer needed for this translator */
     
-    /* Network should already be initialized by main() */
+    /* Initialize network if not already done */
+    /* Note: main() is never called for Hurd translators, so we must initialize here */
     if (!global_network.initialized) {
-        return EIO;  /* Network not initialized - should not happen */
+        /* Initialize with default topology */
+        uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
+        if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
+            return EIO;  /* Initialization failed */
+        }
     }
     
     return 0;  /* Success */
