@@ -16,8 +16,9 @@ INCLUDES = -Iinclude
 UNAME := $(shell uname -s)
 
 # Hurd libraries - only link on GNU/Hurd systems
-# These libraries (-ltrivfs, -lhurdfs, -lports, -lshouldbeinlibc) are part of
-# the GNU/Hurd system and are required for the translator to function.
+# Standard Hurd libraries: libtrivfs, libfshelp, libhurdsig, libports, libshouldbeinlibc
+# Note: libhurdfs does NOT exist in standard GNU/Hurd - it was likely a confusion
+#       with the Hurd File System. We use the correct standard libraries instead.
 # On Debian/Linux, use 'make compile' to only compile without linking.
 ifeq ($(UNAME),Linux)
     # On Linux, we can only compile the object files without linking
@@ -25,7 +26,8 @@ ifeq ($(UNAME),Linux)
     LIBS =
 else
     # On GNU/Hurd or other systems, use Hurd libraries
-    LIBS = -lm -lpthread -ltrivfs -lhurdfs -lports -lshouldbeinlibc
+    # Standard Hurd libraries: trivfs, fshelp, ports, shouldbeinlibc, hurdsig
+    LIBS = -lm -lpthread -ltrivfs -lfshelp -lhurdsig -lports -lshouldbeinlibc
 endif
 
 INSTALL_DIR = /hurd
