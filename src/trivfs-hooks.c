@@ -86,41 +86,41 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     /* Build output buffer with network information */
     char buffer[4096];
     size_t written = 0;
-    int result;
+    int snprintf_result;  /* Renamed to avoid redeclaration */
     
     /* Title and separator */
-    result = snprintf(buffer, sizeof(buffer),
+    snprintf_result = snprintf(buffer, sizeof(buffer),
                       "LLM Sigmoid Neuron Translator - GNU Hurd\n"
                       "===========================================\n\n");
-    if (result < 0) return EIO;
-    written = (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written = (size_t)snprintf_result;
     
     /* Network topology */
-    int result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Network: %d layers", global_network.topology.layer_count);
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     for (uint8_t i = 0; i < global_network.topology.layer_count; i++) {
-        result = snprintf(buffer + written, sizeof(buffer) - written,
+        snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                           ", %d", global_network.topology.layer_sizes[i]);
-        if (result < 0) return EIO;
-        written += (size_t)result;
+        if (snprintf_result < 0) return EIO;
+        written += (size_t)snprintf_result;
     }
-    result = snprintf(buffer + written, sizeof(buffer) - written, "\n\n");
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written, "\n\n");
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     
     /* Memory usage */
-    result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Memory: %.2f KB, Neurons: %zu, Weights: %zu\n\n",
                        (double)global_network.memory_block_size / 1024.0,
                        global_network.total_neurons,
                        global_network.total_weights);
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     
     /* Neuron parameters */
-    result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Parameters:\n"
                        "  Reset Potential: %.2f mV\n"
                        "  Threshold: %.2f mV\n"
@@ -130,30 +130,30 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        global_network.topology.threshold,
                        global_network.topology.leak_rate,
                        global_network.topology.refractory_length);
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     
     /* Current output */
-    result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Output:\n");
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
-        result = snprintf(buffer + written, sizeof(buffer) - written,
+        snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                           "  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
-        if (result < 0) return EIO;
-        written += (size_t)result;
+        if (snprintf_result < 0) return EIO;
+        written += (size_t)snprintf_result;
     }
     
     /* Statistics */
-    result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "\nStatistics:\n"
                        "  Forward Passes: %zu\n"
                        "  Neuron Activations: %zu\n\n",
                        global_network.forward_pass_count,
                        global_network.neuron_activations);
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     
     /* Usage instructions */
     result = snprintf(buffer + written, sizeof(buffer) - written,
@@ -293,5 +293,6 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     /* Delegate to the trivfs server message handler */
-    return trivfs_server(inmsg, outmsg);
+    /* trivfs_server expects mach_msg_header_t (pointer), not mach_msg_header_t * (pointer to pointer) */
+    return trivfs_server(*inmsg, *outmsg);
 }
