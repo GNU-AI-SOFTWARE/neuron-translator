@@ -33,7 +33,7 @@
  *****************************************************************************/
 
 /** Global network instance shared across all translator operations */
-static CompactNeuralNetwork global_network = {0};
+CompactNeuralNetwork global_network = {0};
 
 
 /*****************************************************************************
@@ -57,12 +57,9 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     
     *iobuf = NULL;  /* No I/O buffer needed for this translator */
     
-    /* Initialize network with default topology if not already done */
+    /* Network should already be initialized by main() */
     if (!global_network.initialized) {
-        uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
-        if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
-            return ENOMEM;
-        }
+        return EIO;  /* Network not initialized - should not happen */
     }
     
     return 0;  /* Success */
@@ -81,41 +78,49 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)offset;   /* Unused parameter */
     (void)count;    /* Unused parameter */
     
-    /* Initialize network if not already done */
+    /* Network should already be initialized by main() */
     if (!global_network.initialized) {
-        uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
-        if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
-            return ENOMEM;
-        }
+        return EIO;  /* Network not initialized - should not happen */
     }
     
     /* Build output buffer with network information */
     char buffer[4096];
     size_t written = 0;
+    int result;
     
     /* Title and separator */
-    written = snprintf(buffer, sizeof(buffer),
+    result = snprintf(buffer, sizeof(buffer),
                       "LLM Sigmoid Neuron Translator - GNU Hurd\n"
                       "===========================================\n\n");
+    if (result < 0) return EIO;
+    written = (size_t)result;
     
     /* Network topology */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    int result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Network: %d layers", global_network.topology.layer_count);
-    for (int i = 0; i < global_network.topology.layer_count; i++) {
-        written += snprintf(buffer + written, sizeof(buffer) - written,
+    if (result < 0) return EIO;
+    written += (size_t)result;
+    for (uint8_t i = 0; i < global_network.topology.layer_count; i++) {
+        result = snprintf(buffer + written, sizeof(buffer) - written,
                           ", %d", global_network.topology.layer_sizes[i]);
+        if (result < 0) return EIO;
+        written += (size_t)result;
     }
-    written += snprintf(buffer + written, sizeof(buffer) - written, "\n\n");
+    result = snprintf(buffer + written, sizeof(buffer) - written, "\n\n");
+    if (result < 0) return EIO;
+    written += (size_t)result;
     
     /* Memory usage */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Memory: %.2f KB, Neurons: %zu, Weights: %zu\n\n",
                        (double)global_network.memory_block_size / 1024.0,
                        global_network.total_neurons,
                        global_network.total_weights);
+    if (result < 0) return EIO;
+    written += (size_t)result;
     
     /* Neuron parameters */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Parameters:\n"
                        "  Reset Potential: %.2f mV\n"
                        "  Threshold: %.2f mV\n"
@@ -125,25 +130,33 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        global_network.topology.threshold,
                        global_network.topology.leak_rate,
                        global_network.topology.refractory_length);
+    if (result < 0) return EIO;
+    written += (size_t)result;
     
     /* Current output */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Output:\n");
+    if (result < 0) return EIO;
+    written += (size_t)result;
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
-        written += snprintf(buffer + written, sizeof(buffer) - written,
+        result = snprintf(buffer + written, sizeof(buffer) - written,
                           "  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
+        if (result < 0) return EIO;
+        written += (size_t)result;
     }
     
     /* Statistics */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    result = snprintf(buffer + written, sizeof(buffer) - written,
                        "\nStatistics:\n"
                        "  Forward Passes: %zu\n"
                        "  Neuron Activations: %zu\n\n",
                        global_network.forward_pass_count,
                        global_network.neuron_activations);
+    if (result < 0) return EIO;
+    written += (size_t)result;
     
     /* Usage instructions */
-    written += snprintf(buffer + written, sizeof(buffer) - written,
+    result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Usage:\n"
                        "  cat /llm                    - Show info\n"
                        "  echo '10,20,5' > /llm      - Set topology\n"
@@ -151,6 +164,8 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        "  echo reset > /llm         - Reset network state\n"
                        "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
                        "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
+    if (result < 0) return EIO;
+    written += (size_t)result;
     
     /* Ensure null-termination */
     if (written >= sizeof(buffer)) {
@@ -192,12 +207,9 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return EINVAL;
     }
     
-    /* Initialize network if not already done */
+    /* Network should already be initialized by main() */
     if (!global_network.initialized) {
-        uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
-        if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
-            return ENOMEM;
-        }
+        return EIO;  /* Network not initialized - should not happen */
     }
     
     /* Copy input to temporary buffer */
@@ -215,12 +227,16 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
     if (newline) *newline = '\0';
     
     /* Handle special commands */
-    if (strncmp(temp, "reset", 5) == 0) {
-        network_reset(&global_network);
-        return 0;
+    /* Check for "reset" command - must be exactly "reset" or "reset" followed by separator */
+    if (strlen(temp) >= 5 && strncmp(temp, "reset", 5) == 0) {
+        if (temp[5] == '\0' || temp[5] == ' ' || temp[5] == '\t') {
+            network_reset(&global_network);
+            return 0;
+        }
     }
     
-    if (strncmp(temp, "save ", 5) == 0) {
+    /* Check for "save <filename>" command */
+    if (strlen(temp) >= 5 && strncmp(temp, "save ", 5) == 0) {
         char *filename = temp + 5;
         if (*filename != '\0') {
             if (network_save(&global_network, filename)) {
@@ -230,7 +246,8 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return EINVAL;
     }
     
-    if (strncmp(temp, "load ", 5) == 0) {
+    /* Check for "load <filename>" command */
+    if (strlen(temp) >= 5 && strncmp(temp, "load ", 5) == 0) {
         char *filename = temp + 5;
         if (*filename != '\0') {
             if (network_load(&global_network, filename)) {

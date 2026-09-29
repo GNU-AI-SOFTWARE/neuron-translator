@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <math.h>       /* For expf() */
 
 
 /*****************************************************************************
@@ -72,7 +73,7 @@ typedef struct NetworkTopology {
     float threshold;                /**< Firing threshold (mV) */
     float leak_rate;                /**< Voltage decay rate */
     uint8_t refractory_length;      /**< Post-spike silence period */
-    uint8_t _padding[3];             /**< Structure padding for alignment */
+    uint8_t padding[3];              /**< Structure padding for alignment */
 } NetworkTopology;
 
 /** Compact neural network with contiguous memory allocation */

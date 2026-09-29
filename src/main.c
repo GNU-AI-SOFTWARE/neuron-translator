@@ -19,6 +19,9 @@
  */
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "neuron.h"
 #include "trivfs-hooks.h"
@@ -36,18 +39,12 @@
  * Initializes the global network and starts the trivfs server loop.
  * This function is called by the Hurd system when the translator is loaded.
  * 
- * @param argc Number of command-line arguments
- * @param argv Array of command-line arguments
- * @return    Exit code (should not return for a translator)
+ * @return Exit code (should not return for a translator)
  */
-int main(int argc, char **argv)
+int main(void)
 {
-    (void)argc;  /* Unused parameter */
-    (void)argv;   /* Unused parameter */
-    
-    /* Initialize global network state */
-    global_network.initialized = false;
-    global_network.memory_block = NULL;
+    /* Initialize global network state to zero */
+    memset(&global_network, 0, sizeof(global_network));
     
     /* Set up trivfs control port */
     trivfs_control = MACH_PORT_NULL;
@@ -55,8 +52,10 @@ int main(int argc, char **argv)
     /* Initialize network with default topology */
     uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
     if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
-        /* Failed to initialize, but continue anyway */
-        global_network.initialized = false;
+        /* Failed to initialize - this is fatal for a translator */
+        fprintf(stderr, "sigmoid-neuron-translator: failed to initialize network: %s\n",
+                strerror(errno));
+        return EXIT_FAILURE;
     }
     
     /* Set translator help text */

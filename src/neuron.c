@@ -89,7 +89,7 @@ int network_init(CompactNeuralNetwork *net,
     }
     
     /* Validate each layer size */
-    for (int i = 0; i < layer_count; i++) {
+    for (uint8_t i = 0; i < layer_count; i++) {
         if (layer_sizes[i] == 0 || layer_sizes[i] > MAX_NEURONS_PER_LAYER) {
             errno = EINVAL;
             return -1;
@@ -101,7 +101,7 @@ int network_init(CompactNeuralNetwork *net,
     net->topology.input_size = layer_sizes[0];
     net->topology.output_size = layer_sizes[layer_count - 1];
     
-    for (int i = 0; i < layer_count; i++) {
+    for (uint8_t i = 0; i < layer_count; i++) {
         net->topology.layer_sizes[i] = layer_sizes[i];
     }
     
@@ -113,28 +113,28 @@ int network_init(CompactNeuralNetwork *net,
     
     /* Calculate total neuron count */
     net->total_neurons = 0;
-    for (int i = 0; i < layer_count; i++) {
+    for (uint8_t i = 0; i < layer_count; i++) {
         net->total_neurons += layer_sizes[i];
     }
     
     /* Calculate total weights (sum of layer_i * layer_{i-1}) */
     net->total_weights = 0;
     net->total_biases = 0;
-    for (int i = 1; i < layer_count; i++) {
+    for (uint8_t i = 1; i < layer_count; i++) {
         net->total_weights += (size_t)layer_sizes[i] * (size_t)layer_sizes[i - 1];
         net->total_biases += layer_sizes[i];
     }
     
     /* Calculate layer offsets */
     net->layer_offsets[0] = 0;
-    for (int i = 1; i < layer_count; i++) {
+    for (uint8_t i = 1; i < layer_count; i++) {
         net->layer_offsets[i] = net->layer_offsets[i - 1] + layer_sizes[i - 1];
     }
     
     /* Calculate weight offsets */
     if (layer_count > 1) {
         net->weight_offsets[0] = 0;
-        for (int i = 1; i < layer_count - 1; i++) {
+        for (uint8_t i = 1; i < layer_count - 1; i++) {
             net->weight_offsets[i] = net->weight_offsets[i - 1] +
                                       (size_t)layer_sizes[i] * (size_t)layer_sizes[i - 1];
         }
@@ -142,7 +142,7 @@ int network_init(CompactNeuralNetwork *net,
     
     /* Calculate bias offsets */
     net->bias_offsets[0] = 0;
-    for (int i = 1; i < layer_count; i++) {
+    for (uint8_t i = 1; i < layer_count; i++) {
         net->bias_offsets[i] = net->bias_offsets[i - 1] + layer_sizes[i];
     }
     
@@ -164,7 +164,7 @@ int network_init(CompactNeuralNetwork *net,
     }
     
     /* Set up pointers into the memory block */
-    char *ptr = (char *)net->memory_block;
+    char *ptr = net->memory_block;
     net->voltages = (float *)ptr;
     ptr += voltages_size;
     net->weights = (float *)ptr;
@@ -329,11 +329,12 @@ int parse_config_string(const char *config_str,
         if (*ptr == '\0') break;
         
         /* Parse integer */
+        errno = 0;
         char *endptr;
         long value = strtol(ptr, &endptr, 10);
         
-        if (ptr == endptr) {
-            /* No digit found */
+        if (ptr == endptr || errno == ERANGE) {
+            /* No digit found or out of range */
             errno = EINVAL;
             return -1;
         }
@@ -375,13 +376,13 @@ bool parse_input_string(CompactNeuralNetwork *net,
         if (*ptr == '\0') break;
         
         /* Parse float */
+        errno = 0;
         char *endptr;
         float val = strtof(ptr, &endptr);
         
-        if (ptr == endptr) {
-            /* No number found, skip this character */
-            ptr++;
-            continue;
+        if (ptr == endptr || errno == ERANGE) {
+            /* Invalid number - fail parsing */
+            return false;
         }
         
         net->input_buffer[idx++] = val;
@@ -389,7 +390,7 @@ bool parse_input_string(CompactNeuralNetwork *net,
     }
     
     /* Only execute forward pass if we got all required inputs */
-    if (idx >= net->topology.input_size) {
+    if (idx == net->topology.input_size) {
         network_forward(net);
         return true;
     }
@@ -532,7 +533,7 @@ bool network_load(CompactNeuralNetwork *net,
     }
     
     /* Set up pointers */
-    char *ptr = (char *)net->memory_block;
+    char *ptr = net->memory_block;
     net->voltages = (float *)ptr;
     ptr += net->total_neurons * sizeof(float);
     net->weights = (float *)ptr;
