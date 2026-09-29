@@ -31,6 +31,7 @@
 
 #include "neuron.h"
 #include "trivfs-hooks.h"  /* Includes all necessary Hurd/Mach declarations */
+#include "debug.h"
 
 
 /*****************************************************************************
@@ -54,22 +55,12 @@ int main(void)
     /* If it is called, it means we're not running as a translator */
 #ifdef __MACH__
     /* On Hurd, if main() is called, it's an error */
-    /* Print to both stderr and stdout for visibility in settrans context */
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
-    fprintf(stdout, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
-    fflush(stderr);
-    fflush(stdout);
+    log_debug_message("[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!");
     return EXIT_FAILURE;
 #else
     /* On non-Hurd systems (like Debian/Linux), display helpful message */
 #ifdef DEBUG
-    fprintf(stderr, "[DEBUG] main(): Starting sigmoid-neuron-translator (non-Hurd system)\n");
+    log_debug_message("[DEBUG] main(): Starting sigmoid-neuron-translator (non-Hurd system)");
 #endif
     
     /* Initialize global network state to zero */

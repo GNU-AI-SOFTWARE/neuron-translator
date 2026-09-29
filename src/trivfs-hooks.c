@@ -24,6 +24,7 @@
 
 #include "neuron.h"
 #include "trivfs-hooks.h"
+#include "debug.h"
 
 
 /*****************************************************************************
@@ -41,7 +42,7 @@ int trivfs_server_loop(void) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
     if (logfile) {
         fprintf(logfile, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
         fflush(logfile);
@@ -59,7 +60,7 @@ error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
     if (logfile) {
         fprintf(logfile, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
         fflush(logfile);
@@ -100,6 +101,15 @@ mach_port_t trivfs_control = MACH_PORT_NULL;
 /* Help text for the translator */
 char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
                 "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
+
+
+/*****************************************************************************
+ *                                                                           *
+ *                    DEBUG LOGGING HELPER FUNCTION                         *
+ *                                                                           *
+ *  Defined in include/debug.h                                                *
+ *                                                                           *
+ *****************************************************************************/
 
 
 /*****************************************************************************
@@ -166,17 +176,10 @@ static void __attribute__((constructor)) translator_init(void)
     /* Set trivfs control port to null */
     trivfs_control = MACH_PORT_NULL;
     
-    /* Debug: Indicate initialization */
-    /* On Hurd, this will be printed to the system log or console */
-    /* On non-Hurd, this helps verify the constructor ran */
+    /* Debug: Indicate initialization - try multiple locations */
+    /* This runs before main() so if this doesn't execute, the binary isn't even loaded */
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] Sigmoid Neuron Translator: Constructor ran\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] Sigmoid Neuron Translator: Constructor ran\n");
+    log_debug_message("[DEBUG] Sigmoid Neuron Translator: Constructor ran");
 #endif
 }
 
@@ -204,7 +207,7 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     (void)node;     /* Unused parameter */
     
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
     if (logfile) {
         fprintf(logfile, "[DEBUG] fs_open_hook called\n");
         fflush(logfile);
@@ -242,7 +245,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)count;    /* Unused parameter */
     
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
     if (logfile) {
         fprintf(logfile, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
         fflush(logfile);
@@ -467,7 +470,7 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     /* This is the actual entry point for the translator on GNU/Hurd */
 #ifdef DEBUG
-    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
     if (logfile) {
         fprintf(logfile, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
         fflush(logfile);

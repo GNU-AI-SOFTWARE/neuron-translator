@@ -43,7 +43,7 @@ executable: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
 
 INSTALL_DIR = /hurd
 
