@@ -10,12 +10,17 @@ SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
-# This Makefile compiles the sigmoid neuron translator for GNU/Hurd
-# On any system: 'make' compiles the object files
-# On GNU/Hurd: 'make link' or 'make install' performs full build with linking
-# Note: Hurd libraries are only available on GNU/Hurd systems
+# Makefile for LLM Sigmoid Neuron Translator - GNU Hurd
+# Copyright (C) 2026 GNU AI Project
+# Author: Claire <claire@gnu-ai.org>
+#
+# This Makefile compiles the translator source files.
+# - On any system: 'make' compiles object files (C23/POSIX compliant)
+# - On GNU/Hurd: 'make executable' links with Hurd libraries to create the translator
+#
+# Note: Hurd libraries (-ltrivfs, -lfshelp, -lports, -lshouldbeinlibc) are only
+#       available on GNU/Hurd systems. On Debian/Linux, only compilation works.
 
-# Compiler and flags
 CC = gcc
 CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 LDFLAGS =
@@ -29,10 +34,10 @@ all: compile
 
 compile: $(OBJS)
 	@echo "Compilation successful. All .o files generated."
-	@echo "On GNU/Hurd, use 'make link' to build the executable."
+	@echo "On GNU/Hurd, use 'make executable' to build the translator."
 
-# Linking target (requires Hurd libraries)
-link: $(TARGET)
+# Executable target - only works on Hurd systems with libraries
+executable: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
