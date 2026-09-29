@@ -13,23 +13,39 @@
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
  *
- *  This header provides access to Hurd trivfs declarations and the global
- *  neural network instance. All Hurd-specific types and functions are
- *  obtained from the official Hurd headers.
+ *  This header provides the interface between the neural network implementation
+ *  and the GNU Hurd trivfs translator system. It follows Claude Delannoy's
+ *  educational style with clear, maintainable code.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
-/*
- * Include Hurd headers first - they define all necessary types and variables.
- * <hurd/trivfs.h> provides:
- *   - fs_open, fs_read, fs_write (function pointer variables)
- *   - trivfs_control, fs_help (variables)
- *   - trivfs_server, trivfs_server_loop (functions)
- * <hurd/iohelp.h> provides:
- *   - struct iobuf, struct node, struct iouser
- */
+
+/*****************************************************************************
+ *                                                                           *
+ *                    FORWARD DECLARATIONS FOR HURD TYPES                    *
+ *                                                                           *
+ *  These forward declarations ensure that Hurd types are visible before use.
+ *  The actual definitions are provided by the Hurd headers included below.
+ *                                                                           *
+ *****************************************************************************/
+
+/* Forward declare Hurd I/O structures */
+struct iobuf;
+struct node;
+struct iouser;
+
+/* Hurd error type */
+typedef int error_t;
+
+
+/*****************************************************************************
+ *                                                                           *
+ *                        HURD HEADERS INCLUSION                            *
+ *                                                                           *
+ *****************************************************************************/
+
 #include <hurd/trivfs.h>
 #include <hurd/iohelp.h>
 
@@ -54,20 +70,53 @@ extern CompactNeuralNetwork global_network;
  *                                                                           *
  *                      HOOK FUNCTION DECLARATIONS                         *
  *                                                                           *
- *  Declare our hook implementations with signatures matching the Hurd
- *  trivfs expectations. We use the same parameter names as in trivfs.h
- *  for maximum compatibility.
- *                                                                           *
  *****************************************************************************/
 
-/* Message demultiplexer */
+/**
+ * @brief Translator message demultiplexer
+ *
+ * @param inmsg  Incoming Mach message header
+ * @param outmsg Outgoing Mach message header
+ * @return       Error code (0 on success)
+ */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/* Filesystem hooks - signatures must exactly match the trivfs function pointers */
+/**
+ * @brief Open hook for translator node
+ *
+ * @param cred  User credentials
+ * @param flags File open flags
+ * @param mode  File creation mode
+ * @param node  Filesystem node
+ * @param iobuf Output: I/O buffer
+ * @return      Error code (0 on success)
+ */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf);
+
+/**
+ * @brief Read hook for translator node
+ *
+ * @param cred   User credentials
+ * @param iobuf  I/O buffer
+ * @param offset Read offset
+ * @param len    Output: number of bytes read
+ * @param count  Maximum bytes to read
+ * @return       Error code (0 on success)
+ */
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                       off_t offset, size_t *len, size_t count);
+
+/**
+ * @brief Write hook for translator node
+ *
+ * @param cred   User credentials
+ * @param iobuf  I/O buffer
+ * @param offset Write offset
+ * @param len    Number of bytes to write
+ * @param count  Reserved (unused)
+ * @return       Error code (0 on success)
+ */
 error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
                        off_t offset, size_t len, size_t count);
 
