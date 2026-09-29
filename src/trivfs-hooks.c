@@ -22,6 +22,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Hurd I/O structures - forward declarations for use in this file */
+struct iobuf;
+struct node;
+struct iouser;
+
 #include "neuron.h"
 #include "trivfs-hooks.h"
 
@@ -156,7 +161,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     written += (size_t)snprintf_result;
     
     /* Usage instructions */
-    result = snprintf(buffer + written, sizeof(buffer) - written,
+    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
                        "Usage:\n"
                        "  cat /llm                    - Show info\n"
                        "  echo '10,20,5' > /llm      - Set topology\n"
@@ -164,8 +169,8 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        "  echo reset > /llm         - Reset network state\n"
                        "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
                        "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
-    if (result < 0) return EIO;
-    written += (size_t)result;
+    if (snprintf_result < 0) return EIO;
+    written += (size_t)snprintf_result;
     
     /* Ensure null-termination */
     if (written >= sizeof(buffer)) {
