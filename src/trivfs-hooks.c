@@ -70,23 +70,98 @@ CompactNeuralNetwork global_network = {0};
  *  These variables are declared as extern in trivfs-hooks.h and must be   *
  *  defined here for the linker to find them.                               *
  *                                                                           *
+ *  Note: On GNU/Hurd, the trivfs library uses weak symbols for fs_open,   *
+ *  fs_read, fs_write. We define our own implementations below that        *
+ *  delegate to our hook functions.                                         *
+ *                                                                           *
  *****************************************************************************/
 
 /* Translator control port */
 mach_port_t trivfs_control = MACH_PORT_NULL;
 
 /* Help text for the translator */
-char *fs_help = NULL;
+char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
+                "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
 
-/* Filesystem hook function pointers */
-error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct iobuf **) = NULL;
-error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t) = NULL;
-error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t) = NULL;
+
+/*****************************************************************************
+ *                                                                           *
+ *                 ACTUAL TRIVFS FUNCTION IMPLEMENTATIONS                 *
+ *                                                                           *
+ *  These are the functions that the trivfs library will call directly.    *
+ *  They use weak symbols, so our definitions override the defaults.      *
+ *                                                                           *
+ *****************************************************************************/
+
+/**
+ * fs_open - Called by trivfs library when node is opened
+ * This overrides the default trivfs fs_open with our implementation
+ */
+error_t fs_open(struct iouser *cred, int flags, mode_t mode,
+               struct node *node, struct iobuf **iobuf)
+{
+    return fs_open_hook(cred, flags, mode, node, iobuf);
+}
+
+/**
+ * fs_read - Called by trivfs library when node is read
+ * This overrides the default trivfs fs_read with our implementation
+ */
+error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
+               off_t offset, size_t *len, size_t count)
+{
+    return fs_read_hook(cred, iobuf, offset, len, count);
+}
+
+/**
+ * fs_write - Called by trivfs library when node is written
+ * This overrides the default trivfs fs_write with our implementation
+ */
+error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
+                off_t offset, size_t len, size_t count)
+{
+    return fs_write_hook(cred, iobuf, offset, len, count);
+}
+
+
+/*****************************************************************************
+ *                                                                           *
+ *              INITIALIZATION FOR GNU/HURD TRANSLATOR                      *
+ *                                                                           *
+ *  On GNU/Hurd, main() is never called for translators. Instead, we use     *
+ *  a constructor attribute to run initialization before the first request. *
+ *                                                                           *
+ *****************************************************************************/
+
+/**
+ * translator_init - Constructor function for Hurd translator
+ * This runs before main() on non-Hurd systems, and before any IPC
+ * message is processed on Hurd. It ensures global variables are initialized.
+ */
+static void __attribute__((constructor)) translator_init(void)
+{
+    /* Initialize global network to zero */
+    if (global_network.memory_block == NULL) {
+        memset(&global_network, 0, sizeof(global_network));
+    }
+    
+    /* Set trivfs control port to null */
+    trivfs_control = MACH_PORT_NULL;
+    
+    /* Debug: Indicate initialization */
+    /* On Hurd, this will be printed to the system log or console */
+    /* On non-Hurd, this helps verify the constructor ran */
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] Sigmoid Neuron Translator: Constructor ran\n");
+#endif
+}
 
 
 /*****************************************************************************
  *                                                                           *
  *                      TRIVFS HOOK IMPLEMENTATIONS                         *
+ *                                                                           *
+ *  These are our internal hook implementations that do the actual work.   *
  *                                                                           *
  *****************************************************************************/
 
@@ -103,6 +178,10 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     (void)flags;    /* Unused parameter */
     (void)mode;     /* Unused parameter */
     (void)node;     /* Unused parameter */
+    
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] fs_open_hook called\n");
+#endif
     
     *iobuf = NULL;  /* No I/O buffer needed for this translator */
     
@@ -132,7 +211,11 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)offset;   /* Unused parameter */
     (void)count;    /* Unused parameter */
     
-    /* Network should already be initialized by main() */
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
+#endif
+    
+    /* Network should already be initialized by fs_open_hook */
     if (!global_network.initialized) {
         return EIO;  /* Network not initialized - should not happen */
     }

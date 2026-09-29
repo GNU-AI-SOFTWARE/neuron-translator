@@ -121,10 +121,13 @@ extern mach_port_t trivfs_control;
 /* Help text for the translator - defined in src/trivfs-hooks.c */
 extern char *fs_help;
 
-/* Filesystem hook function pointers - defined in src/trivfs-hooks.c */
-extern error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct iobuf **);
-extern error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
-extern error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t);
+/* 
+ * Filesystem hook functions - defined in src/trivfs-hooks.c
+ * These override the default trivfs implementations via weak symbols
+ */
+extern error_t fs_open(struct iouser *, int, mode_t, struct node *, struct iobuf **);
+extern error_t fs_read(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
+extern error_t fs_write(struct iouser *, struct iobuf *, off_t, size_t, size_t);
 
 
 /*****************************************************************************

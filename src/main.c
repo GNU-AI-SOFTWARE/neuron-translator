@@ -16,6 +16,11 @@
  *  This file contains the main() function that initializes the translator
  *  and starts the Hurd trivfs server loop. It follows GNU Hurd translator
  *  conventions and provides the entry point for the system.
+ *
+ *  IMPORTANT: On GNU/Hurd, the main() function is NEVER called for filesystem
+ *  translators. The entry point is through the trivfs interface (trivfs_demuxer).
+ *  This main() function is only for non-Hurd systems (Debian/Linux) for testing
+ *  and compilation verification.
  */
 
 #include <stddef.h>
@@ -46,6 +51,15 @@
  */
 int main(void)
 {
+    /* 
+     * On GNU/Hurd, main() is never called for translators.
+     * The entry point is trivfs_demuxer() which is called by the Hurd system.
+     * This code only runs on non-Hurd systems for testing.
+     *
+     * However, we still initialize the network here for non-Hurd testing.
+     * On actual Hurd, initialization happens in fs_open_hook().
+     */
+    
     /* Initialize global network state to zero */
     memset(&global_network, 0, sizeof(global_network));
     
@@ -60,16 +74,6 @@ int main(void)
                 strerror(errno));
         return EXIT_FAILURE;
     }
-    
-    /* Set translator help text */
-    fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
-              "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
-    
-    /* Register our filesystem hooks with explicit type casting */
-    /* This ensures type compatibility with Hurd's function pointer declarations */
-    fs_open = (error_t (*)(struct iouser *, int, mode_t, struct node *, struct iobuf **))fs_open_hook;
-    fs_read = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t *, size_t))fs_read_hook;
-    fs_write = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t, size_t))fs_write_hook;
     
     /* Start the trivfs server loop - this should not return on Hurd */
     /* On non-Hurd systems, trivfs_server_loop returns -1 (stub implementation) */
