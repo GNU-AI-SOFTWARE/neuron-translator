@@ -13,12 +13,14 @@
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
+ *
+ *  NOTE: Hurd-specific type definitions (struct iobuf, struct node, struct iouser)
+ *  are provided in trivfs-hooks.c to avoid conflicts with system headers.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
-#include <errno.h>
 #include <sys/types.h>
 
 /*****************************************************************************
@@ -30,8 +32,9 @@
 #endif
 
 /*****************************************************************************
- *  ON HURD: USE SYSTEM HEADERS
- *  On non-Hurd: provide complete type declarations
+ *  TYPES - Must be defined before any function using them
+ *  On Hurd: We include Mach headers for mach_port_t
+ *  On non-Hurd: We typedef mach_port_t ourselves
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -39,20 +42,24 @@
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
-#include <hurd/trivfs.h>
 #else
-/* Complete type definitions for non-Hurd systems */
+/* Non-Hurd systems: provide Mach type definitions */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
+#endif
+
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
 
-/* Hurd types - complete definitions for non-Hurd */
+/*
+ * Forward declarations for Hurd types.
+ * Complete definitions are in trivfs-hooks.c where we need to access members.
+ */
 struct iouser;
 struct node;
 struct iobuf;
+
 typedef int error_t;
-#endif
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS

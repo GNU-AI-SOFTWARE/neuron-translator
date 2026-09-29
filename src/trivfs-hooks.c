@@ -24,14 +24,18 @@
 /*****************************************************************************
  *  HURD DETECTION AND TYPE DEFINITIONS
  *  
- *  On Hurd: Use system headers from <hurd/trivfs.h>
- *  On non-Hurd: Provide complete type definitions
+ *  We provide complete type definitions for struct iobuf, struct node,
+ *  and struct iouser regardless of the platform, as we need to access
+ *  their members (like iobuf->buf). On Hurd, these types are only
+ *  forward-declared in <hurd/trivfs.h>, so we provide our own complete
+ *  definitions that match the Hurd implementation.
  *****************************************************************************/
 
 #if defined(__GNU__) && !defined(__GNU_LIBRARY__)
 #define ON_HURD 1
 #endif
 
+/* Always include Mach/Hurd headers on Hurd for mach_port_t, error_t, etc. */
 #if defined(ON_HURD)
 #include <mach.h>
 #include <mach/port.h>
@@ -39,13 +43,20 @@
 #include <hurd.h>
 #include <hurd/trivfs.h>
 #else
-/* Non-Hurd systems: provide complete type definitions */
+/* On non-Hurd, provide Mach type definitions */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
+typedef int error_t;
+#endif
 
-/* Hurd types - complete definitions for non-Hurd */
+/*
+ * Complete type definitions for Hurd filesystem structures.
+ * These match the definitions used internally by libtrivfs.
+ * We define them here regardless of platform to ensure we can access
+ * members like iobuf->buf in our hook implementations.
+ */
 struct iouser {
     int uid;
     int gid;
@@ -61,12 +72,9 @@ struct node {
 
 struct iobuf {
     char *buf;
-    size_t buf_size;
+    size_t size;
     off_t offset;
 };
-
-typedef int error_t;
-#endif
 
 
 /*****************************************************************************
