@@ -62,10 +62,11 @@ int main(void)
     fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
               "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
     
-    /* Register our filesystem hooks */
-    fs_open = fs_open_hook;
-    fs_read = fs_read_hook;
-    fs_write = fs_write_hook;
+    /* Register our filesystem hooks with explicit type casting */
+    /* This ensures type compatibility with Hurd's function pointer declarations */
+    fs_open = (error_t (*)(struct iouser *, int, mode_t, struct node *, struct iobuf **))fs_open_hook;
+    fs_read = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t *, size_t))fs_read_hook;
+    fs_write = (error_t (*)(struct iouser *, struct iobuf *, off_t, size_t, size_t))fs_write_hook;
     
     /* Start the trivfs server loop - this should not return */
     return trivfs_server_loop();
