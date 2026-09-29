@@ -22,6 +22,7 @@
 #define TRIVFS_HOOKS_H
 
 #include <sys/types.h>
+#include <errno.h>  /* For error_t on Hurd systems */
 
 /*****************************************************************************
  *  HURD DETECTION
@@ -33,8 +34,8 @@
 
 /*****************************************************************************
  *  TYPES - Must be defined before any function using them
- *  On Hurd: We include Mach headers for mach_port_t
- *  On non-Hurd: We typedef mach_port_t ourselves
+ *  On Hurd: Use system headers for mach_port_t, error_t, mach_msg_header_t
+ *  On non-Hurd: Provide our own typedefs that match Hurd's types
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -42,14 +43,19 @@
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
+#include <hurd/trivfs.h>
 #else
-/* Non-Hurd systems: provide Mach type definitions */
+/* Non-Hurd systems: provide Mach type definitions that match Hurd */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
-#endif
 
+/* On Hurd, mach_msg_header_t is the struct type itself, not a pointer */
 struct mach_msg_header;
-typedef struct mach_msg_header *mach_msg_header_t;
+typedef struct mach_msg_header mach_msg_header_t;
+
+/* On Hurd, error_t is an enum, but we use int for simplicity on non-Hurd */
+typedef int error_t;
+#endif
 
 /*
  * Forward declarations for Hurd types.
@@ -58,8 +64,6 @@ typedef struct mach_msg_header *mach_msg_header_t;
 struct iouser;
 struct node;
 struct iobuf;
-
-typedef int error_t;
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
