@@ -26,6 +26,14 @@ HURD_SYSTEM := $(shell echo "$(UNAME_S)" | grep -q GNU && echo yes || echo no)
 # Debug: Show which system we detected
 $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 
+# Define ON_HURD macro for Hurd systems
+ifeq ($(HURD_SYSTEM),yes)
+CFLAGS += -DON_HURD
+$(info Building for GNU/Hurd - ON_HURD defined)
+else
+$(info Building for $(UNAME_S) - ON_HURD not defined)
+endif
+
 # For Hurd translators, we need to include main.c but it should return immediately
 # The actual entry point for trivfs translators is trivfs_demuxer
 # libtrivfs will handle the startup, not main()

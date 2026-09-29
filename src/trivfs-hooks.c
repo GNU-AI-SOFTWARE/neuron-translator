@@ -16,11 +16,19 @@
  *  This file implements the filesystem hooks for the sigmoid neuron translator.
  *  It follows GNU Hurd translator conventions and provides the interface
  *  between the neural network implementation and the Hurd filesystem.
+ *
+ *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Include Hurd headers only when on Hurd */
+#ifdef ON_HURD
+#include <hurd.h>
+#include <hurd/trivfs.h>
+#endif
 
 #include "neuron.h"
 #include "trivfs-hooks.h"
@@ -29,27 +37,21 @@
 
 /*****************************************************************************
  *                                                                           *
- *              STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS                   *
+ *              HURD DETECTION                                               *
  *                                                                           *
- *  These functions are provided by libtrivfs on GNU/Hurd.                  *
- *  On other systems (Debian/Linux), we provide stub implementations      *
- *  to allow compilation. They will never be called on non-Hurd systems.    *
+ *  On GNU/Hurd, we use the standard __GNU__ macro defined by gcc.         *
+ *  This is the primary detection method.                                   *
  *                                                                           *
  *****************************************************************************/
+
+#ifndef ON_HURD
+/* STUB implementations for non-Hurd systems */
 
 /* Stub for trivfs_server_loop - only used on GNU/Hurd */
 int trivfs_server_loop(void) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
-#ifdef DEBUG
-    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
-#endif
+    log_debug_message("[DEBUG] trivfs_server_loop: STUB called - not on Hurd!");
     return -1;
 }
 
@@ -58,18 +60,16 @@ error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
     (void)inmsg;  /* Unused parameter */
     (void)outmsg; /* Unused parameter */
     /* On non-Hurd systems, this function should never be called */
-    /* Return error to indicate translator cannot run without Hurd */
-#ifdef DEBUG
-    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
-#endif
+    log_debug_message("[DEBUG] trivfs_server: STUB called - not on Hurd!");
     return -1;
 }
+
+#else
+/* On Hurd, these are provided by libtrivfs - declare them as extern */
+extern int trivfs_server_loop(void);
+extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
+
+#endif
 
 
 /*****************************************************************************
@@ -128,6 +128,10 @@ char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
                struct node *node, struct iobuf **iobuf)
 {
+    (void)cred;    /* Suppress unused parameter warning */
+    (void)flags;   /* Suppress unused parameter warning */
+    (void)mode;    /* Suppress unused parameter warning */
+    (void)node;    /* Suppress unused parameter warning */
     return fs_open_hook(cred, flags, mode, node, iobuf);
 }
 
@@ -138,6 +142,9 @@ error_t fs_open(struct iouser *cred, int flags, mode_t mode,
 error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
                off_t offset, size_t *len, size_t count)
 {
+    (void)cred;    /* Suppress unused parameter warning */
+    (void)offset;  /* Suppress unused parameter warning */
+    (void)count;   /* Suppress unused parameter warning */
     return fs_read_hook(cred, iobuf, offset, len, count);
 }
 
@@ -148,6 +155,9 @@ error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
 error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
                 off_t offset, size_t len, size_t count)
 {
+    (void)cred;    /* Suppress unused parameter warning */
+    (void)offset;  /* Suppress unused parameter warning */
+    (void)count;   /* Suppress unused parameter warning */
     return fs_write_hook(cred, iobuf, offset, len, count);
 }
 
@@ -462,6 +472,9 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
  * translator. It demultiplexes messages and dispatches them to the
  * appropriate trivfs server function.
  * 
+ * On GNU/Hurd, this is the REAL entry point called by the Hurd filesystem system.
+ * On other systems, this is a stub that will never be called.
+ * 
  * @param inmsg  Pointer to the incoming Mach message header
  * @param outmsg Pointer to the outgoing Mach message header
  * @return       Error code from message processing (0 on success)
@@ -469,20 +482,17 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     /* This is the actual entry point for the translator on GNU/Hurd */
-#ifdef DEBUG
-    FILE *logfile = fopen("/home/claire/translator_debug.log", "a");
-    if (logfile) {
-        fprintf(logfile, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
-        fflush(logfile);
-        fclose(logfile);
-    }
-    fprintf(stderr, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
-    fprintf(stdout, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
-    fflush(stderr);
-    fflush(stdout);
-#endif
+    log_debug_message("[DEBUG] trivfs_demuxer: Called (Hurd entry point)");
     
-    /* Delegate to the trivfs server message handler */
-    /* trivfs_server expects mach_msg_header_t (pointer), not mach_msg_header_t * (pointer to pointer) */
+    (void)inmsg;  /* Suppress unused parameter warning */
+    (void)outmsg; /* Suppress unused parameter warning */
+    
+#ifdef ON_HURD
+    /* On Hurd, delegate to the trivfs server message handler from libtrivfs */
     return trivfs_server(*inmsg, *outmsg);
+#else
+    /* On non-Hurd systems, this should never be called */
+    log_debug_message("[DEBUG] trivfs_demuxer: STUB called - not on Hurd!");
+    return EOPNOTSUPP;
+#endif
 }

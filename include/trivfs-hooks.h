@@ -32,6 +32,19 @@
 #include <errno.h>   /* For errno */
 #include <sys/types.h>  /* For mode_t, off_t, size_t */
 
+/*****************************************************************************
+ *                                                                           *
+ *                    HURD DETECTION                                        *
+ *                                                                           *
+ *  On GNU/Hurd, __GNU__ is defined by gcc. This is the standard detection. *
+ *  __MACH__ may or may not be defined depending on the system configuration. *
+ *                                                                           *
+ *****************************************************************************/
+
+#if defined(__GNU__) && !defined(__GNU_LIBRARY__)
+#define ON_HURD 1
+#endif
+
 
 /*****************************************************************************
  *                                                                           *

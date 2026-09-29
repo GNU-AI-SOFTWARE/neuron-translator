@@ -57,7 +57,7 @@ int main(void)
      * We return 0 to indicate success, but the translator continues running
      * via the trivfs message loop.
      */
-#ifdef __MACH__
+#ifdef ON_HURD
     /* On Hurd, main() is called by trivfs startup but should return immediately
      * The trivfs library will handle the server loop via trivfs_demuxer */
     log_debug_message("[DEBUG] main(): Called on Hurd - returning immediately, real work in trivfs_demuxer");
@@ -69,9 +69,11 @@ int main(void)
 #endif
     
     /* Initialize global network state to zero */
+    extern CompactNeuralNetwork global_network;
     memset(&global_network, 0, sizeof(global_network));
     
     /* Set up trivfs control port */
+    extern mach_port_t trivfs_control;
     trivfs_control = MACH_PORT_NULL;
     
     /* Initialize network with default topology */
