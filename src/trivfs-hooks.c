@@ -18,31 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/*****************************************************************************
- *  NON-HURD TYPE DEFINITIONS
- *  Must be defined BEFORE including headers on non-Hurd systems
- *****************************************************************************/
-
-#ifndef ON_HURD
-
-/* Mach types */
-typedef unsigned int mach_port_t;
-#define MACH_PORT_NULL ((mach_port_t) 0)
-struct mach_msg_header;
-typedef struct mach_msg_header *mach_msg_header_t;
-
-/* Hurd types */
-struct iouser;
-struct node;
-struct iobuf {
-    char *buf;
-    size_t buf_size;
-    off_t offset;
-};
-typedef int error_t;
-
-#endif /* !ON_HURD */
+#include <unistd.h>
 
 /*****************************************************************************
  *  INCLUDE HEADERS
@@ -68,6 +44,28 @@ error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
     (void)inmsg; (void)outmsg;
     log_debug_message("[DEBUG] trivfs_server: STUB - not on Hurd!");
     return -1;
+}
+
+/* On non-Hurd, provide the fs_* functions that would be in libtrivfs */
+error_t fs_open(struct iouser *cred, int flags, mode_t mode,
+               struct node *node, struct iobuf **iobuf)
+{
+    (void)cred; (void)flags; (void)mode; (void)node; (void)iobuf;
+    return ENOSYS;
+}
+
+error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
+               off_t offset, size_t *len, size_t count)
+{
+    (void)cred; (void)iobuf; (void)offset; (void)len; (void)count;
+    return ENOSYS;
+}
+
+error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
+                off_t offset, size_t len, size_t count)
+{
+    (void)cred; (void)iobuf; (void)offset; (void)len; (void)count;
+    return ENOSYS;
 }
 
 #endif /* !ON_HURD */
@@ -98,34 +96,8 @@ static void __attribute__((constructor)) translator_init(void)
 
 
 /*****************************************************************************
- *  TRIVFS HOOKS - Delegate to our implementations
- *  These override the default trivfs implementations via weak symbols
- *****************************************************************************/
-
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node *node, struct iobuf **iobuf)
-{
-    (void)cred; (void)flags; (void)mode; (void)node;
-    return fs_open_hook(cred, flags, mode, node, iobuf);
-}
-
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-               off_t offset, size_t *len, size_t count)
-{
-    (void)cred; (void)offset; (void)count;
-    return fs_read_hook(cred, iobuf, offset, len, count);
-}
-
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                off_t offset, size_t len, size_t count)
-{
-    (void)cred; (void)offset; (void)count;
-    return fs_write_hook(cred, iobuf, offset, len, count);
-}
-
-
-/*****************************************************************************
  *  HOOK IMPLEMENTATIONS
+ *  These are our actual implementations that get called
  *****************************************************************************/
 
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
@@ -245,13 +217,12 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     }
     buffer[written] = '\0';
     
-    if (iobuf == NULL || iobuf->buf == NULL) {
-        *len = written;
-        return 0;
+    if (len == NULL) {
+        return EINVAL;
     }
     
     size_t to_copy = (written < *len) ? written : *len;
-    if (to_copy > 0 && iobuf->buf != NULL) {
+    if (to_copy > 0 && iobuf != NULL && iobuf->buf != NULL) {
         memcpy(iobuf->buf, buffer, to_copy);
     }
     *len = to_copy;
@@ -265,7 +236,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 {
     (void)cred; (void)offset; (void)count;
     
-    if (iobuf == NULL || len == 0 || iobuf->buf == NULL) {
+    if (len == 0) {
         return EINVAL;
     }
     
@@ -277,6 +248,11 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
     if (len >= sizeof(temp)) {
         len = sizeof(temp) - 1;
     }
+    
+    if (iobuf == NULL || iobuf->buf == NULL) {
+        return EINVAL;
+    }
+    
     memcpy(temp, iobuf->buf, len);
     temp[len] = '\0';
     
@@ -342,7 +318,10 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     log_debug_message("[DEBUG] trivfs_demuxer: Called (Hurd entry point)");
-    (void)inmsg; (void)outmsg;
+    
+    if (inmsg == NULL || outmsg == NULL) {
+        return EINVAL;
+    }
     
 #ifdef ON_HURD
     /* On Hurd, delegate to libtrivfs */

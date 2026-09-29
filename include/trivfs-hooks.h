@@ -31,7 +31,7 @@
 
 /*****************************************************************************
  *  ON HURD: USE SYSTEM HEADERS
- *  On non-Hurd: provide minimal type declarations
+ *  On non-Hurd: provide complete type declarations
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -41,37 +41,43 @@
 #include <hurd.h>
 #include <hurd/trivfs.h>
 #else
-/* Minimal types for non-Hurd systems */
+/* Complete type definitions for non-Hurd systems */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
-struct iouser;
-struct node;
-struct iobuf;
+
+/* Hurd types - complete definitions for non-Hurd */
+struct iouser {
+    int uid;
+    int gid;
+    int *uids;
+    int *gids;
+    int nuids;
+    int ngids;
+};
+
+struct node {
+    void *data;
+};
+
+struct iobuf {
+    char *buf;
+    size_t buf_size;
+    off_t offset;
+};
+
 typedef int error_t;
 #endif
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
- *  On Hurd: fs_open, fs_read, fs_write are in <hurd/trivfs.h>
- *  On non-Hurd: declare them here
  *****************************************************************************/
 
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-#ifndef ON_HURD
-/* Filesystem hooks - on Hurd these are in <hurd/trivfs.h> */
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node *node, struct iobuf **iobuf);
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-               off_t offset, size_t *len, size_t count);
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                off_t offset, size_t len, size_t count);
-#endif
-
-/* Hook implementations - always declared as they are our functions */
+/* Hook implementations - our functions */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf);
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
