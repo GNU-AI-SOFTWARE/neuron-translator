@@ -14,9 +14,9 @@
  *  @brief Hurd trivfs translator interface declarations
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  *
- *  NOTE: We provide our own definitions of struct iouser, struct node,
- *  struct iobuf to match libtrivfs internal types, as they are not
- *  fully exposed in public Hurd headers.
+ *  NOTE: struct iouser, struct node, struct iobuf are forward-declared here.
+ *  Complete definitions are in trivfs-hooks.c (from <hurd/iohelp.h> on Hurd,
+ *  or our own definitions on non-Hurd).
  */
 
 #ifndef TRIVFS_HOOKS_H
@@ -34,13 +34,7 @@
 #endif
 
 /*****************************************************************************
- *  TYPES
- *  On Hurd: Include Mach headers for basic types
- *  On non-Hurd: Provide Mach type definitions
- *  
- *  For struct iouser, struct node, struct iobuf: we always provide our own
- *  definitions to ensure we can access members like iobuf->buf.
- *  These match the internal libtrivfs definitions.
+ *  TYPES - Basic Mach/Hurd types
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -58,34 +52,23 @@ typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
 #endif
 
-/*
- * Complete definitions for Hurd filesystem structures.
- * These match the internal libtrivfs definitions.
- * We define them here to ensure we can access members like iobuf->buf.
- */
-struct iouser {
-    int uid;
-    int gid;
-    int *uids;
-    int *gids;
-    int nuids;
-    int ngids;
-};
-
-struct node {
-    void *data;
-};
-
-struct iobuf {
-    char *buf;
-    size_t size;
-    off_t offset;
-};
+/* Forward declarations for Hurd types */
+struct iouser;
+struct node;
+struct iobuf;
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
- *  Note: Hook implementations are in trivfs-hooks.c
+ *  Hook implementations are declared here, using forward-declared types
  *****************************************************************************/
+
+/* Hook implementations */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
 
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);

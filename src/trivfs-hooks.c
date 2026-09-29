@@ -31,7 +31,7 @@
 
 /*****************************************************************************
  *  INCLUDE SYSTEM HEADERS
- *  On Hurd: Include Mach/Hurd headers for basic types
+ *  On Hurd: Include all Hurd headers including iohelp.h for complete type definitions
  *  On non-Hurd: We'll define types ourselves below
  *****************************************************************************/
 
@@ -41,30 +41,16 @@
 #include <mach/message.h>
 #include <hurd.h>
 #include <hurd/trivfs.h>
-#endif
-
-
-/*****************************************************************************
- *  TYPE DEFINITIONS
- *  We provide complete definitions for struct iouser, struct node, struct iobuf
- *  to match libtrivfs internal types. These are needed to access members like iobuf->buf.
- *  On Hurd, the system headers only forward-declare these types, so we define them.
- *  On non-Hurd, we define them as well for consistency.
- *****************************************************************************/
-
-#ifndef ON_HURD
+#include <hurd/iohelp.h>  /* Provides complete definitions of struct iouser, node, iobuf */
+#else
 /* Non-Hurd systems: provide Mach type definitions */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
-#endif
 
-/*
- * Complete definitions for Hurd filesystem structures.
- * These match the internal libtrivfs definitions.
- */
+/* Hurd types - complete definitions for non-Hurd */
 struct iouser {
     int uid;
     int gid;
@@ -83,6 +69,7 @@ struct iobuf {
     size_t size;
     off_t offset;
 };
+#endif
 
 
 /*****************************************************************************
@@ -161,6 +148,8 @@ error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  HOOK IMPLEMENTATIONS
+ *  On Hurd: types come from <hurd/iohelp.h>
+ *  On non-Hurd: types come from our definitions above
  *****************************************************************************/
 
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
