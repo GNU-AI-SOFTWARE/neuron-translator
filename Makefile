@@ -51,9 +51,10 @@ executable: $(TARGET)
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
 	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	# On Hurd, translators must have trivfs_demuxer as entry point, not _start/main
-	# Without this, ld will look for main() and fail
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
+	# On Hurd, translators must NOT use standard startup files (which expect main())
+	# Use -nostartfiles to avoid Scrt1.o which calls main()
+	# And explicitly set entry point to trivfs_demuxer
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -nostartfiles -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
 
 INSTALL_DIR = /hurd
 
