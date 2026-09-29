@@ -15,7 +15,19 @@ CC = gcc
 CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L -DDEBUG
 LDFLAGS =
 TARGET = sigmoid-neuron-translator
+# Detect if we're on a Hurd system
+# On Hurd: uname -s = GNU, and /usr/lib/libtrivfs* exists
+# On Linux: uname -s = Linux
+
+# Check if this is a Hurd system
+HURD_SYSTEM := $(shell uname -s 2>/dev/null | grep -q GNU && echo yes || echo no)
+
+# On Hurd systems, exclude main.c as filesystem translators use trivfs_demuxer, not main()
+ifeq ($(HURD_SYSTEM),yes)
+SRCS = src/neuron.c src/trivfs-hooks.c
+else
 SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
+endif
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
@@ -31,7 +43,7 @@ executable: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-e,trivfs_demuxer
 
 INSTALL_DIR = /hurd
 

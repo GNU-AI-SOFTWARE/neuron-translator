@@ -41,6 +41,12 @@ int trivfs_server_loop(void) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
 #endif
     return -1;
@@ -53,6 +59,12 @@ error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
 #endif
     return -1;
@@ -158,6 +170,12 @@ static void __attribute__((constructor)) translator_init(void)
     /* On Hurd, this will be printed to the system log or console */
     /* On non-Hurd, this helps verify the constructor ran */
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] Sigmoid Neuron Translator: Constructor ran\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] Sigmoid Neuron Translator: Constructor ran\n");
 #endif
 }
@@ -186,6 +204,12 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
     (void)node;     /* Unused parameter */
     
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] fs_open_hook called\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] fs_open_hook called\n");
 #endif
     
@@ -218,6 +242,12 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)count;    /* Unused parameter */
     
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] fs_read_hook called, initialized=%d\n", global_network.initialized);
 #endif
     
@@ -437,6 +467,12 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
     /* This is the actual entry point for the translator on GNU/Hurd */
 #ifdef DEBUG
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
     fprintf(stdout, "[DEBUG] trivfs_demuxer: Called (Hurd entry point)\n");
     fflush(stderr);

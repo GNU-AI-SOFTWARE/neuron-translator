@@ -55,6 +55,12 @@ int main(void)
 #ifdef __MACH__
     /* On Hurd, if main() is called, it's an error */
     /* Print to both stderr and stdout for visibility in settrans context */
+    FILE *logfile = fopen("/tmp/translator_debug.log", "a");
+    if (logfile) {
+        fprintf(logfile, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
+        fflush(logfile);
+        fclose(logfile);
+    }
     fprintf(stderr, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
     fprintf(stdout, "[ERROR] main() was called on Hurd system! Translators use trivfs_demuxer(), not main()!\n");
     fflush(stderr);
