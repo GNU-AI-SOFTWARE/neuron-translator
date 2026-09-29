@@ -83,17 +83,12 @@ struct iobuf {
  *                                                                           *
  *                    ERROR TYPES                                           *
  *                                                                           *
- *  Hurd uses error_t for error codes. We ensure compatibility with       *
- *  the system's error_t definition.                                        *
+ *  Hurd uses error_t for error codes, which is defined in <errno.h>.       *
+ *  We rely on the system's definition.                                     *
  *                                                                           *
  *****************************************************************************/
 
-/* Use the system's error_t if available, otherwise define it */
-#ifndef _ERROR_T_DEFINED
-typedef int error_t;
-#define _ERROR_T_DEFINED
-#endif
-
+/* error_t is defined in <errno.h> which is included above */
 
 /*****************************************************************************
  *                                                                           *
