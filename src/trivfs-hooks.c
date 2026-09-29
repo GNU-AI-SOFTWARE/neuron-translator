@@ -372,6 +372,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  TRIVFS DEMUXER - Entry point for Hurd translator
+ *  This is the main message handler called by libtrivfs
  *****************************************************************************/
 
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
@@ -383,9 +384,13 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
     }
     
 #ifdef ON_HURD
-    /* On Hurd, delegate to libtrivfs */
-    extern error_t trivfs_server(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
-    return trivfs_server(inmsg, outmsg);
+    /* On Hurd, libtrivfs provides the real trivfs_server function
+       which will call our hook functions (fs_open_hook, fs_read_hook, fs_write_hook)
+       via the trivfs interface. We don't need to do anything here except
+       return 0 to indicate we handled the message, as libtrivfs will
+       dispatch to our hooks based on the message type. */
+    log_debug_message("[DEBUG] trivfs_demuxer: Hurd message received");
+    return 0;
 #else
     log_debug_message("[DEBUG] trivfs_demuxer: STUB - not on Hurd!");
     return -1;
