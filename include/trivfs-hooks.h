@@ -54,20 +54,24 @@ typedef int error_t;
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
+ *  On Hurd: fs_open, fs_read, fs_write are in <hurd/trivfs.h>
+ *  On non-Hurd: declare them here
  *****************************************************************************/
 
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/* Filesystem hooks */
+#ifndef ON_HURD
+/* Filesystem hooks - on Hurd these are in <hurd/trivfs.h> */
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
                struct node *node, struct iobuf **iobuf);
 error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
                off_t offset, size_t *len, size_t count);
 error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
                 off_t offset, size_t len, size_t count);
+#endif
 
-/* Hook implementations */
+/* Hook implementations - always declared as they are our functions */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf);
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
