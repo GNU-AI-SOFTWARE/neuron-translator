@@ -38,8 +38,4 @@ uninstall:
 clean:
 	rm -f $(TARGET) *~ *.o
 
-# Alternative: Build modular version
-modular:
-	make -f Makefile.modular
-
-.PHONY: all install uninstall clean modular
+.PHONY: all install uninstall clean
