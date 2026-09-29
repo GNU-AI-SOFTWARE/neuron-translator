@@ -22,16 +22,18 @@
 #include <errno.h>
 
 /*****************************************************************************
- *  HURD DETECTION AND TYPE DEFINITIONS
- *  
- *  On Hurd: Use system headers which already define struct iouser, struct node,
- *           struct iobuf completely in <hurd/iohelp.h>
- *  On non-Hurd: Provide our own complete type definitions
+ *  HURD DETECTION
  *****************************************************************************/
 
 #if defined(__GNU__) && !defined(__GNU_LIBRARY__)
 #define ON_HURD 1
 #endif
+
+/*****************************************************************************
+ *  INCLUDE SYSTEM HEADERS
+ *  On Hurd: Include Hurd headers which define all necessary types
+ *  On non-Hurd: We'll define types ourselves later
+ *****************************************************************************/
 
 #if defined(ON_HURD)
 #include <mach.h>
@@ -39,10 +41,18 @@
 #include <mach/message.h>
 #include <hurd.h>
 #include <hurd/trivfs.h>
-/* On Hurd, struct iouser, struct node, struct iobuf are already defined
-   in <hurd/iohelp.h> which is included by <hurd/trivfs.h> */
-#else
-/* Non-Hurd systems: provide Mach type definitions */
+#include <hurd/iohelp.h>  /* Defines struct iouser, struct node, struct iobuf */
+#endif
+
+
+/*****************************************************************************
+ *  TYPE DEFINITIONS FOR NON-HURD SYSTEMS
+ *  On Hurd, all types are already defined by system headers
+ *  On non-Hurd, we need to define them ourselves
+ *****************************************************************************/
+
+#ifndef ON_HURD
+/* Mach types */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
@@ -80,17 +90,27 @@ struct iobuf {
 
 
 /*****************************************************************************
- *  FUNCTION FORWARD DECLARATIONS (only visible in this file)
- *  These are declared here to avoid type visibility issues with Hurd headers
+ *  GLOBAL VARIABLES
  *****************************************************************************/
 
-/* Hook implementations */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
+CompactNeuralNetwork global_network = {0};
+mach_port_t trivfs_control = MACH_PORT_NULL;
+char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
+                "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
+
+
+/*****************************************************************************
+ *  INITIALIZATION
+ *****************************************************************************/
+
+static void __attribute__((constructor)) translator_init(void)
+{
+    if (global_network.memory_block == NULL) {
+        memset(&global_network, 0, sizeof(global_network));
+    }
+    trivfs_control = MACH_PORT_NULL;
+    log_debug_message("[DEBUG] Sigmoid Neuron Translator: Constructor ran");
+}
 
 
 /*****************************************************************************
@@ -136,32 +156,11 @@ error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 
 /*****************************************************************************
- *  GLOBAL VARIABLES
- *****************************************************************************/
-
-CompactNeuralNetwork global_network = {0};
-mach_port_t trivfs_control = MACH_PORT_NULL;
-char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
-                "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
-
-
-/*****************************************************************************
- *  INITIALIZATION
- *****************************************************************************/
-
-static void __attribute__((constructor)) translator_init(void)
-{
-    if (global_network.memory_block == NULL) {
-        memset(&global_network, 0, sizeof(global_network));
-    }
-    trivfs_control = MACH_PORT_NULL;
-    log_debug_message("[DEBUG] Sigmoid Neuron Translator: Constructor ran");
-}
-
-
-/*****************************************************************************
  *  HOOK IMPLEMENTATIONS
- *  These are our actual implementations that get called
+ *  These are defined directly without forward declarations to avoid
+ *  type visibility issues with Hurd system headers.
+ *  On Hurd: types come from <hurd/iohelp.h>
+ *  On non-Hurd: types come from our definitions above
  *****************************************************************************/
 
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,

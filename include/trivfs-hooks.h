@@ -14,8 +14,8 @@
  *  @brief Hurd trivfs translator interface declarations
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  *
- *  NOTE: Hurd-specific type definitions (struct iobuf, struct node, struct iouser)
- *  are provided in trivfs-hooks.c to avoid conflicts with system headers.
+ *  NOTE: On Hurd, struct iouser, struct node, struct iobuf are defined in
+ *  <hurd/iohelp.h>. On non-Hurd, they are defined in trivfs-hooks.c.
  */
 
 #ifndef TRIVFS_HOOKS_H
@@ -33,9 +33,7 @@
 #endif
 
 /*****************************************************************************
- *  TYPES - Must be defined before any function using them
- *  On Hurd: Use system headers for mach_port_t, error_t, mach_msg_header_t
- *  On non-Hurd: Provide our own typedefs that match Hurd's types
+ *  TYPES - On Hurd use system headers, on non-Hurd provide our own
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -44,23 +42,17 @@
 #include <mach/message.h>
 #include <hurd.h>
 #include <hurd/trivfs.h>
+#include <hurd/iohelp.h>  /* Defines struct iouser, struct node, struct iobuf */
 #else
-/* Non-Hurd systems: provide Mach type definitions that match Hurd */
+/* Non-Hurd systems: provide Mach type definitions */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
-
-/* On Hurd, mach_msg_header_t is the struct type itself, not a pointer */
 struct mach_msg_header;
 typedef struct mach_msg_header mach_msg_header_t;
-
-/* On Hurd, error_t is an enum, but we use int for simplicity on non-Hurd */
 typedef int error_t;
 #endif
 
-/*
- * Forward declarations for Hurd types.
- * Complete definitions are in trivfs-hooks.c where we need to access members.
- */
+/* Forward declarations for Hurd types (defined in iohelp.h on Hurd) */
 struct iouser;
 struct node;
 struct iobuf;
@@ -88,7 +80,7 @@ extern char *fs_help;
 #ifndef ON_HURD
 /* Stub functions for non-Hurd systems */
 extern int trivfs_server_loop(void);
-extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
+extern error_t trivfs_server(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 #endif
 
 /*****************************************************************************
