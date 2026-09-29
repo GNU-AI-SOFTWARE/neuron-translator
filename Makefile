@@ -13,7 +13,7 @@ INCLUDES = -Iinclude
 # System detection for library selection
 # On GNU/Hurd, these libraries are available and required
 # On other systems (Debian/Linux), they may not be available
-UNAME := $(strip $(shell uname -s))
+UNAME := $(shell uname -s | tr -d '\n')
 
 # Hurd libraries - only link on GNU/Hurd systems
 # Standard Hurd libraries: libtrivfs, libfshelp, libports, libshouldbeinlibc
