@@ -14,16 +14,17 @@
  *  @brief Hurd trivfs translator interface declarations
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  *
- *  NOTE: struct iouser, struct node, struct iobuf are forward-declared here.
- *  Complete definitions are in trivfs-hooks.c (from <hurd/iohelp.h> on Hurd,
- *  or our own definitions on non-Hurd).
+ *  NOTE: We provide our own definitions of Hurd types to avoid conflicts
+ *  with system headers. The system's <hurd/iohelp.h> only provides partial
+ *  definitions (struct iouser is complete, but struct node and struct iobuf
+ *  are only forward-declared).
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
 #include <sys/types.h>
-#include <errno.h>
+#include <errno.h>  /* For error_t */
 
 /*****************************************************************************
  *  HURD DETECTION
@@ -34,7 +35,9 @@
 #endif
 
 /*****************************************************************************
- *  TYPES - Basic Mach/Hurd types
+ *  BASIC MACH TYPES
+ *  On Hurd: Use system headers
+ *  On non-Hurd: Provide our own definitions
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -42,15 +45,24 @@
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
-#include <hurd/trivfs.h>
 #else
-/* Non-Hurd systems: provide Mach type definitions */
+/* Non-Hurd systems */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
 #endif
+
+/* mach_msg_header_t is either from system or our typedef above */
+
+/*****************************************************************************
+ *  HURD FILESYSTEM TYPES
+ *  We always provide our own complete definitions to ensure we can access
+ *  members like iobuf->buf. These match the internal libtrivfs types.
+ *  Note: We avoid including <hurd/trivfs.h> and <hurd/iohelp.h> as they
+ *  cause redefinition conflicts with struct iouser.
+ *****************************************************************************/
 
 /* Forward declarations for Hurd types */
 struct iouser;
@@ -59,7 +71,6 @@ struct iobuf;
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
- *  Hook implementations are declared here, using forward-declared types
  *****************************************************************************/
 
 /* Hook implementations */

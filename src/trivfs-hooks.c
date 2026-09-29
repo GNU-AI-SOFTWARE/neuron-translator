@@ -30,9 +30,9 @@
 #endif
 
 /*****************************************************************************
- *  INCLUDE SYSTEM HEADERS
- *  On Hurd: Include all Hurd headers including iohelp.h for complete type definitions
- *  On non-Hurd: We'll define types ourselves below
+ *  BASIC MACH TYPES
+ *  On Hurd: Use system headers
+ *  On non-Hurd: Provide our own definitions
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -40,17 +40,26 @@
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
-#include <hurd/trivfs.h>
-#include <hurd/iohelp.h>  /* Provides complete definitions of struct iouser, node, iobuf */
 #else
-/* Non-Hurd systems: provide Mach type definitions */
+/* Non-Hurd systems */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
+#endif
 
-/* Hurd types - complete definitions for non-Hurd */
+
+/*****************************************************************************
+ *  COMPLETE HURD FILESYSTEM TYPE DEFINITIONS
+ *  We provide these ourselves because:
+ *  - On Hurd: <hurd/iohelp.h> only provides struct iouser completely,
+ *    but struct node and struct iobuf are only forward-declared
+ *  - On non-Hurd: We need complete definitions to access iobuf->buf
+ *  These match the internal libtrivfs type definitions.
+ *****************************************************************************/
+
+/* Complete definitions for all Hurd filesystem structures */
 struct iouser {
     int uid;
     int gid;
@@ -69,7 +78,6 @@ struct iobuf {
     size_t size;
     off_t offset;
 };
-#endif
 
 
 /*****************************************************************************
@@ -148,8 +156,7 @@ error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  HOOK IMPLEMENTATIONS
- *  On Hurd: types come from <hurd/iohelp.h>
- *  On non-Hurd: types come from our definitions above
+ *  Using our complete type definitions from above
  *****************************************************************************/
 
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
