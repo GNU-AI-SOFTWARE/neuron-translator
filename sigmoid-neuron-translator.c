@@ -76,10 +76,35 @@ typedef int error_t;
 #define MACH_PORT_NULL 0
 #endif
 
-/* Note: All trivfs variables and functions (trivfs_control, fs_help, 
-   fs_open, fs_read, fs_write, trivfs_server, trivfs_server_loop) 
-   are declared in <hurd/trivfs.h> and should not be redeclared here */
+/* Declare trivfs variables if not already declared by Hurd headers */
+#ifndef __TRIVFS_DECLARATIONS
+#define __TRIVFS_DECLARATIONS
 
+/* External trivfs variables */
+extern mach_port_t trivfs_control;
+extern char *fs_help;
+
+/* External filesystem operation hooks */
+extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
+                           struct iobuf **);
+extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
+                           size_t);
+extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
+                            size_t);
+
+/* External trivfs server functions */
+extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
+extern int trivfs_server_loop(void);
+
+#endif /* __TRIVFS_DECLARATIONS */
+
+/* Forward declarations for our filesystem hooks */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
 
 /*****************************************************************************
  *                                                                           *
