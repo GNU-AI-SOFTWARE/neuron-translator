@@ -64,6 +64,7 @@ typedef int error_t;
 #include <hurd.h>             /* Hurd base definitions */
 #include <hurd/fs.h>          /* Filesystem interface */
 #include <hurd/trivfs.h>      /* Trivial filesystem translator */
+#include <hurd/iohelp.h>      /* I/O buffer definitions (struct iobuf) */
 
 #include <mach/mach.h>        /* Mach kernel interface */
 #include <mach/port.h>        /* Mach port interface */
@@ -73,33 +74,6 @@ typedef int error_t;
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
-
-/* Hurd filesystem types - defined here if not in headers */
-/* Note: Hurd headers may only declare these as incomplete types */
-#ifndef _HURD_IOHELP_H
-#ifndef _HURD_TRIVFS_H
-/* If Hurd headers don't provide full definitions, we define them here */
-
-/* I/O buffer structure for filesystem operations */
-struct iobuf {
-    char *buf;              /* Pointer to buffer data */
-    size_t buf_size;        /* Size of buffer */
-    off_t offset;           /* Current offset in file */
-};
-
-/* Filesystem node structure */
-struct node {
-    void *data;             /* Node-specific data */
-};
-
-/* User credentials structure */
-struct iouser {
-    int uid;                /* User ID */
-    int gid;                /* Group ID */
-};
-
-#endif /* _HURD_TRIVFS_H */
-#endif /* _HURD_IOHELP_H */
 
 /* External trivfs variables */
 extern mach_port_t trivfs_control;
@@ -114,16 +88,16 @@ extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
                             size_t);
 
 /* External trivfs server functions */
-extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
+extern int trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
 extern int trivfs_server_loop(void);
 
 /* Forward declarations for our filesystem hooks */
-static error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                            struct node *node, struct iobuf **iobuf);
-static error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                            off_t offset, size_t *len, size_t count);
-static error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                             off_t offset, size_t len, size_t count);
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
 
 
 /*****************************************************************************
@@ -687,8 +661,8 @@ static bool network_load(CompactNeuralNetwork *net,
 /**
  * fs_open_hook - Called when translator node is opened
  */
-static error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                           struct node *node, struct iobuf **iobuf)
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf)
 {
     (void)cred; (void)flags; (void)mode; (void)node;
     *iobuf = NULL;
@@ -707,8 +681,8 @@ static error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
 /**
  * fs_read_hook - Called when translator node is read
  */
-static error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                           off_t offset, size_t *len, size_t count)
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                     off_t offset, size_t *len, size_t count)
 {
     (void)cred; (void)offset; (void)count;
     
@@ -751,7 +725,10 @@ static error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                        "\nUsage:\n"
                        "  cat /llm                    - Show info\n"
                        "  echo '10,20,5' > /llm      - Set topology\n"
-                       "  echo '0.5,0.3,0.8' > /llm  - Set input\n");
+                       "  echo '0.5,0.3,0.8' > /llm  - Set input\n"
+                       "  echo reset > /llm         - Reset network state\n"
+                       "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
+                       "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
     
     if (written >= sizeof(buffer)) {
         written = sizeof(buffer) - 1;
@@ -776,8 +753,8 @@ static error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
 /**
  * fs_write_hook - Called when translator node is written to
  */
-static error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                            off_t offset, size_t len, size_t count)
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t len, size_t count)
 {
     (void)cred; (void)offset; (void)count;
     
@@ -798,6 +775,38 @@ static error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
     }
     memcpy(temp, iobuf->buf, len);
     temp[len] = '\0';
+    
+    /* Remove trailing newline for easier parsing */
+    char *newline = strchr(temp, '\n');
+    if (newline) *newline = '\0';
+    newline = strchr(temp, '\r');
+    if (newline) *newline = '\0';
+    
+    /* Handle special commands */
+    if (strncmp(temp, "reset", 5) == 0) {
+        network_reset(&global_network);
+        return 0;
+    }
+    
+    if (strncmp(temp, "save ", 5) == 0) {
+        char *filename = temp + 5;
+        if (*filename != '\0') {
+            if (network_save(&global_network, filename)) {
+                return 0;
+            }
+        }
+        return EINVAL;
+    }
+    
+    if (strncmp(temp, "load ", 5) == 0) {
+        char *filename = temp + 5;
+        if (*filename != '\0') {
+            if (network_load(&global_network, filename)) {
+                return 0;
+            }
+        }
+        return EINVAL;
+    }
     
     uint16_t layers[MAX_LAYERS];
     int layer_count = parse_config_string(temp, layers, MAX_LAYERS);
@@ -820,9 +829,18 @@ static error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 
 /**
  * trivfs_demuxer - Message demultiplexer
+ * 
+ * This function is the entry point for all Mach messages received by the
+ * translator. It demultiplexes messages and dispatches them to the
+ * appropriate trivfs server function.
+ * 
+ * @param inmsg  Pointer to the incoming Mach message header
+ * @param outmsg Pointer to the outgoing Mach message header
+ * @return        Error code from message processing (0 on success)
  */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
+    /* Delegate to the trivfs server message handler */
     return trivfs_server(inmsg, outmsg);
 }
 
