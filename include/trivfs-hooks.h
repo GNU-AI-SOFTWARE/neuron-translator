@@ -17,8 +17,8 @@
  *  translator to interface with GNU Hurd's trivfs system. It follows
  *  Claude Delannoy's educational style with clear, maintainable code.
  *
- *  Note: We declare Hurd symbols explicitly here to ensure they are
- *  visible before use. The actual implementations are in Hurd libraries.
+ *  Note: We include all necessary system headers FIRST, then declare
+ *  our own symbols. This ensures all types are properly defined.
  */
 
 #ifndef TRIVFS_HOOKS_H
@@ -27,54 +27,28 @@
 
 /*****************************************************************************
  *                                                                           *
- *                    FORWARD DECLARATIONS FOR HURD TYPES                    *
+ *                        SYSTEM HEADERS INCLUSION                           *
+ *                                                                           *
+ *  Include ALL system headers first to ensure all types are defined        *
+ *  before we use them in our declarations.                                   *
  *                                                                           *
  *****************************************************************************/
 
-/* Forward declare Hurd I/O and filesystem structures */
-struct iobuf;
-struct node;
-struct iouser;
-
-/* Hurd types (defined in <hurd/hurd_types.h> or <bits/error_t.h>) */
-typedef enum __error_t_codes error_t;
-
-/* Mach message types */
-typedef struct mach_msg_header_t *mach_msg_header_t;
-
-
-/*****************************************************************************
- *                                                                           *
- *                    HURD TRIVFS VARIABLES AND FUNCTIONS                    *
- *                                                                           *
- *  These are the standard trivfs interface variables and functions that
- *  must be declared for a translator to work correctly.
- *                                                                           *
- *****************************************************************************/
-
-/* Translator control port */
-extern mach_port_t trivfs_control;
-
-/* Help text for the translator */
-extern char *fs_help;
-
-/* Filesystem hook function pointers */
-extern error_t (*fs_open)(struct iouser *, int, mode_t, struct node *, struct iobuf **);
-extern error_t (*fs_read)(struct iouser *, struct iobuf *, off_t, size_t *, size_t);
-extern error_t (*fs_write)(struct iouser *, struct iobuf *, off_t, size_t, size_t);
-
-/* Server functions */
-extern error_t trivfs_server(mach_msg_header_t, mach_msg_header_t);
-extern int trivfs_server_loop(void);
-
-
-/*****************************************************************************
- *                                                                           *
- *                      POSIX TYPES (from sys/types.h)                       *
- *                                                                           *
- *****************************************************************************/
-
+/* POSIX types */
 #include <sys/types.h>  /* For mode_t, off_t, size_t */
+
+/* Mach IPC types */
+#include <mach/mach.h>    /* For mach_port_t, MACH_PORT_NULL */
+#include <mach/port.h>
+#include <mach/message.h>
+
+/* Hurd trivfs */
+#include <hurd.h>
+#include <hurd/trivfs.h>
+#include <hurd/iohelp.h>
+
+/* Our neural network types */
+#include "neuron.h"
 
 
 /*****************************************************************************
@@ -83,9 +57,6 @@ extern int trivfs_server_loop(void);
  *                                                                           *
  *****************************************************************************/
 
-/* Our neural network types */
-#include "neuron.h"
-
 /** Global network instance - defined in src/trivfs-hooks.c */
 extern CompactNeuralNetwork global_network;
 
@@ -93,6 +64,10 @@ extern CompactNeuralNetwork global_network;
 /*****************************************************************************
  *                                                                           *
  *                      HOOK FUNCTION DECLARATIONS                         *
+ *                                                                           *
+ *  Declare our hook implementations. All Hurd types (error_t, struct iobuf,
+ *  struct node, struct iouser, mach_port_t, etc.) are already defined by
+ *  the headers included above.
  *                                                                           *
  *****************************************************************************/
 
@@ -103,7 +78,7 @@ extern CompactNeuralNetwork global_network;
  * @param outmsg Outgoing Mach message header
  * @return       Error code (0 on success)
  */
-int trivfs_demuxer(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
+int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
 /**
  * @brief Open hook for translator node

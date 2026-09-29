@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>  /* For errno */
 
 #include "neuron.h"
 #include "trivfs-hooks.h"
