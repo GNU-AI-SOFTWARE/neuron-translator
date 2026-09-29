@@ -42,28 +42,24 @@
 /**
  * @brief Main entry point for the sigmoid neuron translator
  * 
- * Initializes the global network and starts the trivfs server loop.
- * This function is called by the Hurd system when the translator is loaded.
- * On non-Hurd systems (like Debian/Linux), this will run in a limited mode
- * or display an informative message.
+ * On non-Hurd systems (like Debian/Linux), this initializes and tests the translator.
+ * On GNU/Hurd, this function should NEVER be called for filesystem translators.
+ * The actual entry point on Hurd is trivfs_demuxer() called by the Hurd filesystem system.
  * 
- * @return Exit code (should not return for a translator on Hurd)
+ * @return Exit code (0 on success, non-zero on error)
  */
 int main(void)
 {
-    /* 
-     * On GNU/Hurd, main() is never called for translators.
-     * The entry point is trivfs_demuxer() which is called by the Hurd system.
-     * This code only runs on non-Hurd systems for testing.
-     *
-     * However, we still initialize the network here for non-Hurd testing.
-     * On actual Hurd, initialization happens in fs_open_hook().
-     */
-    
+    /* On GNU/Hurd, main() should never be called for translators */
+    /* If it is called, it means we're not running as a translator */
+#ifdef __MACH__
+    /* On Hurd, if main() is called, it's an error */
+    fprintf(stderr, "[ERROR] main() called on Hurd system - translator should use trivfs_demuxer entry point!\n");
+    return EXIT_FAILURE;
+#else
+    /* On non-Hurd systems (like Debian/Linux), display helpful message */
 #ifdef DEBUG
-    fprintf(stderr, "[DEBUG] main(): Starting sigmoid-neuron-translator\n");
-    fprintf(stderr, "[DEBUG] main(): NOTE - This is running on a NON-Hurd system!\n");
-    fprintf(stderr, "[DEBUG] main(): On GNU/Hurd, main() is NEVER called for translators.\n");
+    fprintf(stderr, "[DEBUG] main(): Starting sigmoid-neuron-translator (non-Hurd system)\n");
 #endif
     
     /* Initialize global network state to zero */
@@ -110,4 +106,7 @@ int main(void)
     }
     
     return result;
+#endif
+    
+    return EXIT_SUCCESS;
 }
