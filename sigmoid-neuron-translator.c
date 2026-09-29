@@ -77,6 +77,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <pthread.h>
 
 
 /*****************************************************************************
@@ -102,7 +103,6 @@ typedef int error_t;
 #if ON_HURD
 
 /* On Hurd, include the real headers */
-#include <pthread.h>
 #include <hurd.h>
 #include <hurd/fs.h>
 #include <hurd/trivfs.h>
@@ -116,8 +116,6 @@ typedef int error_t;
 #else /* !ON_HURD */
 
 /* On Linux, provide stubs */
-#include <pthread.h>
-
 typedef unsigned int mach_port_t;
 typedef struct mach_msg_header *mach_msg_header_t;
 
