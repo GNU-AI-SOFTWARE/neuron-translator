@@ -64,7 +64,6 @@ typedef int error_t;
 
 #include <hurd.h>             /* Hurd base definitions */
 #include <hurd/fs.h>          /* Filesystem interface */
-#include <hurd/fshelp.h>      /* Filesystem helper functions */
 #include <hurd/trivfs.h>      /* Trivial filesystem translator */
 #include <hurd/iohelp.h>      /* I/O buffer definitions (struct iobuf) */
 
