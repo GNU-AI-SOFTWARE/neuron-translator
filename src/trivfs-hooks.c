@@ -52,14 +52,6 @@ typedef int error_t;
 #include "debug.h"
 #include "trivfs-hooks.h"
 
-/* Forward declarations for hook implementations */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
-
 
 /*****************************************************************************
  *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
