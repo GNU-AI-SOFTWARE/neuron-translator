@@ -228,7 +228,11 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
     (void)offset;   /* Unused parameter */
     (void)count;    /* Unused parameter */
     
-    log_debug_message("[DEBUG] fs_read_hook called, initialized=%d", global_network.initialized);
+    {
+        char debug_msg[256];
+        snprintf(debug_msg, sizeof(debug_msg), "[DEBUG] fs_read_hook called, initialized=%d", global_network.initialized);
+        log_debug_message(debug_msg);
+    }
     
     /* Network should already be initialized by fs_open_hook */
     if (!global_network.initialized) {
