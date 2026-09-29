@@ -13,20 +13,19 @@
 /** @file trivfs-hooks.h
  *  @brief Hurd trivfs translator interface declarations
  *
- *  On GNU/Hurd: uses system types from <hurd/trivfs.h>.
- *  On other systems: provides minimal opaque declarations.
+ *  On GNU/Hurd: system headers define all types.
+ *  On other systems: this header provides necessary declarations.
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
-#include <errno.h>   /* For errno */
-#include <sys/types.h>  /* For mode_t, off_t, size_t */
+#include <errno.h>
+#include <sys/types.h>
 
 /*****************************************************************************
  *  HURD DETECTION
- *  On GNU/Hurd, __GNU__ is defined by gcc
  *****************************************************************************/
 
 #if defined(__GNU__) && !defined(__GNU_LIBRARY__)
@@ -34,8 +33,8 @@
 #endif
 
 /*****************************************************************************
- *  MACH/HURD TYPES
- *  On Hurd: use system headers. On other systems: opaque forward declarations.
+ *  TYPE DEFINITIONS
+ *  On Hurd: use system types. On other systems: define them.
  *****************************************************************************/
 
 #if defined(ON_HURD)
@@ -45,47 +44,60 @@
 #include <hurd.h>
 #include <hurd/trivfs.h>
 #else
-/* Fallback types for non-Hurd systems */
+/* Fallback type definitions for non-Hurd systems */
+
+/* Mach types */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
+
 struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
+
+/* Hurd types */
 struct iouser;
 struct node;
 struct iobuf;
-#endif
+
+/* Error type - error_t is typically int, but use actual errno values */
+typedef int error_t;
+
+#endif /* ON_HURD */
 
 /*****************************************************************************
- *  TRANSLATOR VARIABLES
+ *  FUNCTION DECLARATIONS
  *****************************************************************************/
 
-extern mach_port_t trivfs_control;
-extern char *fs_help;
-
-/*****************************************************************************
- *  STUB FUNCTIONS FOR NON-HURD SYSTEMS
- *****************************************************************************/
-
-#ifndef ON_HURD
-/* On non-Hurd systems, provide stub declarations */
-extern int trivfs_server_loop(void);
-extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
-#endif
-
-/*****************************************************************************
- *  HOOK FUNCTION DECLARATIONS
- *****************************************************************************/
-
-/* Main translator entry point */
+/* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/* Filesystem hooks - these override trivfs defaults via weak symbols */
+/* Filesystem hooks */
+error_t fs_open(struct iouser *cred, int flags, mode_t mode,
+               struct node *node, struct iobuf **iobuf);
+error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
+               off_t offset, size_t *len, size_t count);
+error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
+                off_t offset, size_t len, size_t count);
+
+/* Hook implementations */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf);
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                       off_t offset, size_t *len, size_t count);
 error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
                        off_t offset, size_t len, size_t count);
+
+#ifndef ON_HURD
+/* Stub functions for non-Hurd */
+extern int trivfs_server_loop(void);
+extern error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg);
+#endif
+
+/*****************************************************************************
+ *  GLOBAL VARIABLES
+ *****************************************************************************/
+
+extern mach_port_t trivfs_control;
+extern char *fs_help;
 
 /*****************************************************************************
  *  NEURAL NETWORK
