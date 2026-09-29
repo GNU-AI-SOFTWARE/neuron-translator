@@ -28,6 +28,33 @@
 
 /*****************************************************************************
  *                                                                           *
+ *              STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS                   *
+ *                                                                           *
+ *  These functions are provided by libtrivfs on GNU/Hurd.                  *
+ *  On other systems (Debian/Linux), we provide stub implementations      *
+ *  to allow compilation. They will never be called on non-Hurd systems.    *
+ *                                                                           *
+ *****************************************************************************/
+
+/* Stub for trivfs_server_loop - only used on GNU/Hurd */
+int trivfs_server_loop(void) {
+    /* On non-Hurd systems, this function should never be called */
+    /* Return error to indicate translator cannot run without Hurd */
+    return -1;
+}
+
+/* Stub for trivfs_server - only used on GNU/Hurd */
+error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
+    (void)inmsg;  /* Unused parameter */
+    (void)outmsg; /* Unused parameter */
+    /* On non-Hurd systems, this function should never be called */
+    /* Return error to indicate translator cannot run without Hurd */
+    return -1;
+}
+
+
+/*****************************************************************************
+ *                                                                           *
  *                         GLOBAL NETWORK INSTANCE                          *
  *                                                                           *
  *****************************************************************************/
