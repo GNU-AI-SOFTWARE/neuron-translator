@@ -38,6 +38,9 @@ ifeq ($(UNAME),Linux)
 all: compile
 else
 all: $(TARGET)
+$(TARGET): $(OBJS)
+	@echo "Linking with Hurd libraries..."
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 endif
 
 # Compile-only target for systems without Hurd libraries (e.g., Debian)
@@ -45,15 +48,6 @@ compile: $(OBJS)
 	@echo "Compilation successful. All .o files generated."
 	@echo "Note: On Debian/Linux, use 'make compile' or 'make' to compile without linking."
 	@echo "      On GNU/Hurd, use 'make' for full build with linking."
-
-# Linking rule - only defined on Hurd systems
-ifeq ($(UNAME),Linux)
-# On Linux, don't define the linking rule - we only compile
-else
-$(TARGET): $(OBJS)
-	@echo "Linking with Hurd libraries..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
-endif
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
