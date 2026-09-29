@@ -34,12 +34,6 @@ endif
 
 INSTALL_DIR = /hurd
 
-# Compile-only target for systems without Hurd libraries (e.g., Debian)
-compile: $(OBJS)
-	@echo "Compilation successful. All .o files generated."
-	@echo "Note: On Debian/Linux, use 'make compile' or 'make' to compile without linking."
-	@echo "      On GNU/Hurd, use 'make' for full build with linking."
-
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
