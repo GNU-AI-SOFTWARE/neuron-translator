@@ -384,8 +384,8 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
     
 #ifdef ON_HURD
     /* On Hurd, delegate to libtrivfs */
-    extern error_t trivfs_server(mach_msg_header_t, mach_msg_header_t);
-    return trivfs_server(*inmsg, *outmsg);
+    extern error_t trivfs_server(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
+    return trivfs_server(inmsg, outmsg);
 #else
     log_debug_message("[DEBUG] trivfs_demuxer: STUB - not on Hurd!");
     return -1;
