@@ -30,7 +30,7 @@
 #endif
 
 /*****************************************************************************
- *  ON HURD: INCLUDE SYSTEM HEADERS THAT DEFINE EVERYTHING
+ *  ON HURD: USE SYSTEM HEADERS
  *  On non-Hurd: provide minimal type declarations
  *****************************************************************************/
 
@@ -59,7 +59,7 @@ typedef int error_t;
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
-/* Filesystem hooks - override trivfs defaults */
+/* Filesystem hooks */
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
                struct node *node, struct iobuf **iobuf);
 error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
