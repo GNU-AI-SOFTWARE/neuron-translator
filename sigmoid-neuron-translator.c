@@ -64,7 +64,7 @@ typedef int error_t;
 #endif
 
 
-/* Hurd-specific headers */
+/* Hurd-specific headers and types */
 #if ON_HURD
 #include <hurd.h>
 #include <hurd/fs.h>
@@ -75,13 +75,38 @@ typedef int error_t;
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
+
+/* Forward declarations for trivfs types */
+struct iouser;
+struct node;
+struct iobuf;
+
+/* External trivfs variables */
+extern mach_port_t trivfs_control;
+extern char *fs_help;
+extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
+                           struct iobuf **);
+extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
+                           size_t);
+extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
+                            size_t);
+
+/* External trivfs functions */
+extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
+extern int trivfs_server_loop(void);
+
+/* Forward declarations for our hooks */
+static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *,
+                           struct iobuf **);
+static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *,
+                           size_t);
+static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t,
+                            size_t);
+
 #else
 /* On Linux, provide stubs for Hurd types */
 typedef unsigned int mach_port_t;
 typedef struct mach_msg_header *mach_msg_header_t;
-struct iouser;
-struct node;
-struct iobuf;
 #ifndef MACH_PORT_NULL
 #define MACH_PORT_NULL 0
 #endif
@@ -149,36 +174,6 @@ typedef struct CompactNeuralNetwork {
 
 
 static CompactNeuralNetwork global_network = {0};
-
-
-/*****************************************************************************
- *                                                                           *
- *                    HURD TRIVFS DECLARATIONS (Hurd only)                  *
- *                                                                           *
- *****************************************************************************/
-
-#if ON_HURD
-
-extern mach_port_t trivfs_control;
-extern char *fs_help;
-extern error_t (*fs_open) (struct iouser *, int, mode_t, struct node *,
-                           struct iobuf **);
-extern error_t (*fs_read) (struct iouser *, struct iobuf *, off_t, size_t *,
-                           size_t);
-extern error_t (*fs_write) (struct iouser *, struct iobuf *, off_t, size_t,
-                            size_t);
-
-extern error_t trivfs_server(mach_msg_header_t *, mach_msg_header_t *);
-extern int trivfs_server_loop(void);
-
-static error_t fs_open_hook(struct iouser *, int, mode_t, struct node *,
-                           struct iobuf **);
-static error_t fs_read_hook(struct iouser *, struct iobuf *, off_t, size_t *,
-                           size_t);
-static error_t fs_write_hook(struct iouser *, struct iobuf *, off_t, size_t,
-                            size_t);
-
-#endif /* ON_HURD */
 
 
 /*****************************************************************************
