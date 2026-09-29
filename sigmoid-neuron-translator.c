@@ -191,6 +191,7 @@ static CompactNeuralNetwork global_network = {0};
 #include <hurd.h>             /* Hurd base definitions */
 #include <hurd/fs.h>          /* Filesystem interface */
 #include <hurd/trivfs.h>      /* Trivial filesystem translator interface */
+#include <hurd/iohelp.h>      /* I/O buffer definitions (struct iobuf) */
 
 /* ======================================================================== */
 /* GNU Mach Headers */
