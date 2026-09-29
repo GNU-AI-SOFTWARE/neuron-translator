@@ -67,6 +67,14 @@ error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
 error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
                 off_t offset, size_t len, size_t count);
 
+/* Hook implementations */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
+
 /*****************************************************************************
  *  GLOBAL VARIABLES
  *****************************************************************************/
