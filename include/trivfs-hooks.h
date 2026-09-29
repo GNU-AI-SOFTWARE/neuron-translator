@@ -48,42 +48,20 @@ struct mach_msg_header;
 typedef struct mach_msg_header *mach_msg_header_t;
 
 /* Hurd types - complete definitions for non-Hurd */
-struct iouser {
-    int uid;
-    int gid;
-    int *uids;
-    int *gids;
-    int nuids;
-    int ngids;
-};
-
-struct node {
-    void *data;
-};
-
-struct iobuf {
-    char *buf;
-    size_t buf_size;
-    off_t offset;
-};
-
+struct iouser;
+struct node;
+struct iobuf;
 typedef int error_t;
 #endif
 
 /*****************************************************************************
  *  FUNCTION DECLARATIONS
+ *  Note: Hook implementations are declared in trivfs-hooks.c only
+ *  to avoid type visibility issues with Hurd system headers
  *****************************************************************************/
 
 /* Translator entry point */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
-
-/* Hook implementations - our functions */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
 
 /*****************************************************************************
  *  GLOBAL VARIABLES

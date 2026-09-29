@@ -19,14 +19,76 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 /*****************************************************************************
- *  INCLUDE HEADERS
+ *  HURD DETECTION AND TYPE DEFINITIONS
+ *  
+ *  On Hurd: Use system headers from <hurd/trivfs.h>
+ *  On non-Hurd: Provide complete type definitions
+ *****************************************************************************/
+
+#if defined(__GNU__) && !defined(__GNU_LIBRARY__)
+#define ON_HURD 1
+#endif
+
+#if defined(ON_HURD)
+#include <mach.h>
+#include <mach/port.h>
+#include <mach/message.h>
+#include <hurd.h>
+#include <hurd/trivfs.h>
+#else
+/* Non-Hurd systems: provide complete type definitions */
+typedef unsigned int mach_port_t;
+#define MACH_PORT_NULL ((mach_port_t) 0)
+struct mach_msg_header;
+typedef struct mach_msg_header *mach_msg_header_t;
+
+/* Hurd types - complete definitions for non-Hurd */
+struct iouser {
+    int uid;
+    int gid;
+    int *uids;
+    int *gids;
+    int nuids;
+    int ngids;
+};
+
+struct node {
+    void *data;
+};
+
+struct iobuf {
+    char *buf;
+    size_t buf_size;
+    off_t offset;
+};
+
+typedef int error_t;
+#endif
+
+
+/*****************************************************************************
+ *  INCLUDE PROJECT HEADERS
  *****************************************************************************/
 
 #include "neuron.h"
 #include "debug.h"
-#include "trivfs-hooks.h"
+
+
+/*****************************************************************************
+ *  FUNCTION FORWARD DECLARATIONS (only visible in this file)
+ *  These are declared here to avoid type visibility issues with Hurd headers
+ *****************************************************************************/
+
+/* Hook implementations */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf);
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count);
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count);
 
 
 /*****************************************************************************
@@ -244,13 +306,13 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
         return EIO;
     }
     
+    if (iobuf == NULL || iobuf->buf == NULL) {
+        return EINVAL;
+    }
+    
     char temp[1024];
     if (len >= sizeof(temp)) {
         len = sizeof(temp) - 1;
-    }
-    
-    if (iobuf == NULL || iobuf->buf == NULL) {
-        return EINVAL;
     }
     
     memcpy(temp, iobuf->buf, len);
