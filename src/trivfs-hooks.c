@@ -40,6 +40,9 @@
 int trivfs_server_loop(void) {
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] trivfs_server_loop: STUB called - not on Hurd!\n");
+#endif
     return -1;
 }
 
@@ -49,6 +52,9 @@ error_t trivfs_server(mach_msg_header_t inmsg, mach_msg_header_t outmsg) {
     (void)outmsg; /* Unused parameter */
     /* On non-Hurd systems, this function should never be called */
     /* Return error to indicate translator cannot run without Hurd */
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] trivfs_server: STUB called - not on Hurd!\n");
+#endif
     return -1;
 }
 

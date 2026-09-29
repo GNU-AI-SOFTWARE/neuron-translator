@@ -1,28 +1,18 @@
 # Makefile for LLM Sigmoid Neuron Translator - GNU Hurd
 # Copyright (C) 2026 GNU AI Project
 # Author: Claire <claire@gnu-ai.org>
-
-CC = gcc
-CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
-LDFLAGS =
-TARGET = sigmoid-neuron-translator
-SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
-OBJS = $(SRCS:.c=.o)
-INCLUDES = -Iinclude
-
-# Makefile for LLM Sigmoid Neuron Translator - GNU Hurd
-# Copyright (C) 2026 GNU AI Project
-# Author: Claire <claire@gnu-ai.org>
 #
 # This Makefile compiles the translator source files.
-# - On any system: 'make' compiles object files (C23/POSIX compliant)
+# - On any system: 'make' or 'make compile' compiles object files (C23/POSIX compliant)
 # - On GNU/Hurd: 'make executable' links with Hurd libraries to create the translator
 #
 # Note: Hurd libraries (-ltrivfs, -lfshelp, -lports, -lshouldbeinlibc) are only
 #       available on GNU/Hurd systems. On Debian/Linux, only compilation works.
+#
+# Debug symbols are enabled by default via -DDEBUG flag
 
 CC = gcc
-CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
+CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L -DDEBUG
 LDFLAGS =
 TARGET = sigmoid-neuron-translator
 SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
@@ -45,15 +35,17 @@ $(TARGET): $(OBJS)
 
 INSTALL_DIR = /hurd
 
-INSTALL_DIR = /hurd
-
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 install: $(TARGET)
+	@echo "WARNING: This translator is designed for GNU/Hurd, not Debian/Linux!"
+	@echo "On Debian/Linux, you can only compile with 'make compile'"
+	@echo "On GNU/Hurd, proceed with installation..."
 	install -m 755 $(TARGET) $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)/$(TARGET)"
 	@echo "To use: sudo settrans -c /llm $(INSTALL_DIR)/$(TARGET)"
+	@echo "NOTE: This will only work on a running GNU/Hurd system!"
 
 uninstall:
 	rm -f $(INSTALL_DIR)/$(TARGET)

@@ -60,6 +60,12 @@ int main(void)
      * On actual Hurd, initialization happens in fs_open_hook().
      */
     
+#ifdef DEBUG
+    fprintf(stderr, "[DEBUG] main(): Starting sigmoid-neuron-translator\n");
+    fprintf(stderr, "[DEBUG] main(): NOTE - This is running on a NON-Hurd system!\n");
+    fprintf(stderr, "[DEBUG] main(): On GNU/Hurd, main() is NEVER called for translators.\n");
+#endif
+    
     /* Initialize global network state to zero */
     memset(&global_network, 0, sizeof(global_network));
     
