@@ -29,6 +29,7 @@
  *                                                                           *
  *****************************************************************************/
 
+#include <errno.h>   /* For error_t */
 #include <sys/types.h>  /* For mode_t, off_t, size_t */
 
 
@@ -59,9 +60,6 @@ typedef unsigned int mach_port_t;
 struct iobuf;
 struct node;
 struct iouser;
-
-/* Hurd error type */
-typedef int error_t;
 
 
 /*****************************************************************************
