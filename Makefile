@@ -27,7 +27,7 @@ $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 ifeq ($(HURD_SYSTEM),yes)
 CFLAGS += -DON_HURD
 LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc
-LDFLAGS += -Wl,--nostartfiles
+LDFLAGS += -nostartfiles
 $(info Building for GNU/Hurd - ON_HURD defined)
 else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
