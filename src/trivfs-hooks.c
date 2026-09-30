@@ -237,9 +237,12 @@ info_text_size(void)
  *  MANDATORY TRIVFS HOOKS
  *****************************************************************************/
 
-/* Present the node as a regular file whose size is the status text */
+/* Present the node as a regular file whose size is the status text.
+ * io_statbuf_t (struct stat64) is the type used by the trivfs.h
+ * prototype; using struct stat here conflicts without
+ * -D_FILE_OFFSET_BITS=64. */
 void
-trivfs_modify_stat(struct trivfs_protid *cred, struct stat *st)
+trivfs_modify_stat(struct trivfs_protid *cred, io_statbuf_t *st)
 {
     (void) cred;
 
