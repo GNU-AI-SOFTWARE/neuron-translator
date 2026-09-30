@@ -60,9 +60,10 @@ int main(void)
      * and dispatch to our fs_* functions.
      */
 #if ON_HURD == 1
-    /* On Hurd, call trivfs_server() from libtrivfs
-     * This starts the server and handles all message dispatching
+    /* On Hurd, call trivfs_server() which starts the server loop
      * It will call our fs_open, fs_read, fs_write functions automatically
+     * Note: On Hurd, this should be provided by libtrivfs, but we provide
+     * a fallback implementation in trivfs-hooks.c
      */
     log_debug_message("[DEBUG] main(): Starting trivfs_server on Hurd");
     return trivfs_server();  /* This should not return */
