@@ -27,24 +27,23 @@ $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 ifeq ($(HURD_SYSTEM),yes)
 CFLAGS += -DON_HURD
 LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc
-LDFLAGS += -nostartfiles
 $(info Building for GNU/Hurd - ON_HURD defined)
 else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
 endif
 
 # For Hurd translators, we use a passive translator approach:
-# - On Hurd: No main() needed (libtrivfs provides it, -nostartfiles used)
+# - On Hurd: Use minimal main-hurd.c stub
 # - On non-Hurd: Use main.c for testing/compilation
 # The actual work is done by our fs_open, fs_read, fs_write functions
 
 # Common source files
 COMMON_SRCS = src/neuron.c src/trivfs-hooks.c
 
-# On Hurd, no main.c needed; on other systems, include main.c
+# On Hurd, use minimal main stub; on other systems, use main.c
 ifeq ($(HURD_SYSTEM),yes)
-SRCS = $(COMMON_SRCS)
-$(info Building for GNU/Hurd - Passive translator (no main, using -nostartfiles))
+SRCS = src/main-hurd.c $(COMMON_SRCS)
+$(info Building for GNU/Hurd - Passive translator (with minimal main stub))
 else
 SRCS = src/main.c $(COMMON_SRCS)
 $(info Building for $(UNAME_S) - Including main.c for non-Hurd)
