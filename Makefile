@@ -26,7 +26,8 @@ $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 # Define ON_HURD macro and library flags for Hurd systems
 ifeq ($(HURD_SYSTEM),yes)
 CFLAGS += -DON_HURD
-LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-nostartfiles
+LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc
+LDFLAGS += -Wl,--nostartfiles
 $(info Building for GNU/Hurd - ON_HURD defined)
 else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
