@@ -32,8 +32,8 @@ else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
 endif
 
-# For Hurd translators, we use a PASSIVE translator approach:
-# - On Hurd: NO main() at all - libtrivfs provides it
+# For Hurd translators, we use the standard approach:
+# - On Hurd: Use main-hurd.c which calls trivfs_server() from libtrivfs
 # - On non-Hurd: Use main.c for testing/compilation only
 # The actual work is done by our fs_open, fs_read, fs_write functions
 # libtrivfs will call these functions automatically when messages are received
@@ -41,11 +41,11 @@ endif
 # Common source files
 COMMON_SRCS = src/neuron.c src/trivfs-hooks.c
 
-# On Hurd: passive translator (NO main)
-# On non-Hurd: include main.c for testing
+# On Hurd: use main-hurd.c that calls trivfs_server()
+# On non-Hurd: use main.c for testing
 ifeq ($(HURD_SYSTEM),yes)
-SRCS = $(COMMON_SRCS)
-$(info Building for GNU/Hurd - Passive translator (NO main, libtrivfs handles entry point))
+SRCS = src/main-hurd.c $(COMMON_SRCS)
+$(info Building for GNU/Hurd - Translator with libtrivfs entry point)
 else
 SRCS = src/main.c $(COMMON_SRCS)
 $(info Building for $(UNAME_S) - Including main.c for non-Hurd testing)
