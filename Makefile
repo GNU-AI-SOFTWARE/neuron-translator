@@ -26,7 +26,7 @@ $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 # Define ON_HURD macro and library flags for Hurd systems
 ifeq ($(HURD_SYSTEM),yes)
 CFLAGS += -DON_HURD
-LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc
+LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc -Wl,-nostartfiles
 $(info Building for GNU/Hurd - ON_HURD defined)
 else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
@@ -65,11 +65,7 @@ executable: $(TARGET)
 $(TARGET): $(OBJS)
 	@echo "Linking..."
 	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	ifeq ($(HURD_SYSTEM),yes)
-		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -Wl,-nostartfiles
-	else
-		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
-	endif
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
 
 INSTALL_DIR = /hurd
 
