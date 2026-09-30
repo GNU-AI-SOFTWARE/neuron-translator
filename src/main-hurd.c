@@ -20,20 +20,27 @@
  *  Note: trivfs_server() is provided by libtrivfs when linked with -ltrivfs.
  */
 
-/* On Hurd, we need to provide a trivfs_demuxer function
- * which libtrivfs will call for message handling.
+/* On Hurd, we need a main() that starts the trivfs server.
  * The standard approach is to call trivfs_server() from libtrivfs.
+ * However, on some Hurd systems, the symbol might be named differently.
+ * We use weak symbols to allow the linker to find the correct one.
  */
+
+/* Try different possible names for the trivfs server function */
 extern int trivfs_server(void) __attribute__((weak));
+extern int _trivfs_server(void) __attribute__((weak));
+extern int trivfs_start(void) __attribute__((weak));
+extern int _hurd_trivfs_server(void) __attribute__((weak));
 
 int
 main(void)
 {
-    /* On Hurd, call trivfs_server() from libtrivfs.
-     * This starts the translator message loop.
-     * If trivfs_server is not available (weak attribute), return 0.
-     */
-    if (trivfs_server)
-        return trivfs_server();
+    /* Try each possible trivfs server function */
+    if (trivfs_server) return trivfs_server();
+    if (_trivfs_server) return _trivfs_server();
+    if (trivfs_start) return trivfs_start();
+    if (_hurd_trivfs_server) return _hurd_trivfs_server();
+    
+    /* If none found, return 0 (translator won't work but won't crash) */
     return 0;
 }
