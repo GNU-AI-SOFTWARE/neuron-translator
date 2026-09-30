@@ -15,9 +15,6 @@ CC = gcc
 CFLAGS = -std=c23 -Wall -Wextra -pedantic -O2 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L -DDEBUG
 LDFLAGS =
 TARGET = sigmoid-neuron-translator
-# Detect if we're on a Hurd system
-# On Hurd: uname -s = GNU, and /usr/lib/libtrivfs* exists
-# On Linux: uname -s = Linux
 
 # Check if this is a Hurd system (uname -s returns "GNU" on Hurd)
 UNAME_S := $(shell uname -s 2>/dev/null)
@@ -26,9 +23,10 @@ HURD_SYSTEM := $(shell echo "$(UNAME_S)" | grep -q GNU && echo yes || echo no)
 # Debug: Show which system we detected
 $(info Detected system: $(UNAME_S) -> Hurd=$(HURD_SYSTEM))
 
-# Define ON_HURD macro for Hurd systems
+# Define ON_HURD macro and library flags for Hurd systems
 ifeq ($(HURD_SYSTEM),yes)
 CFLAGS += -DON_HURD
+LDFLAGS += -ltrivfs -lfshelp -lports -lshouldbeinlibc
 $(info Building for GNU/Hurd - ON_HURD defined)
 else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
@@ -55,15 +53,8 @@ executable: $(TARGET)
 
 $(TARGET): $(OBJS)
 	@echo "Linking..."
-	# On Hurd, link with Hurd libraries. On other systems, just link normally.
-	ifeq ($(HURD_SYSTEM),yes)
-		@echo "Linking with Hurd libraries..."
-		@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
-	else
-		@echo "Linking without Hurd libraries (non-Hurd system)"
-		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
-	endif
+	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
 
 INSTALL_DIR = /hurd
 
@@ -94,7 +85,7 @@ src/translator-minimal.o: src/translator-minimal.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 minimal-translator: src/translator-minimal.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -ltrivfs -lfshelp -lports -lshouldbeinlibc
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 install-minimal: minimal-translator
 	install -m 755 minimal-translator /hurd/
