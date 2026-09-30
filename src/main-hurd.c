@@ -20,15 +20,20 @@
  *  Note: trivfs_server() is provided by libtrivfs when linked with -ltrivfs.
  */
 
-/* We need to declare trivfs_server from libtrivfs */
-extern int trivfs_server(void);
+/* On Hurd, we need to provide a trivfs_demuxer function
+ * which libtrivfs will call for message handling.
+ * The standard approach is to call trivfs_server() from libtrivfs.
+ */
+extern int trivfs_server(void) __attribute__((weak));
 
 int
 main(void)
 {
     /* On Hurd, call trivfs_server() from libtrivfs.
-     * This starts the translator and handles all message dispatching.
-     * It will call our fs_open, fs_read, fs_write functions automatically.
+     * This starts the translator message loop.
+     * If trivfs_server is not available (weak attribute), return 0.
      */
-    return trivfs_server();
+    if (trivfs_server)
+        return trivfs_server();
+    return 0;
 }
