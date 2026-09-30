@@ -65,10 +65,12 @@ compile: $(OBJS)
 # Executable target - only works on Hurd systems with libraries
 executable: $(TARGET)
 
+# Libraries must come AFTER the objects: ld scans archives in order,
+# so -ltrivfs before the .o files would pull nothing (undefined refs)
 $(TARGET): $(OBJS)
 	@echo "Linking..."
 	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lm -lpthread
 
 INSTALL_DIR = /hurd
 
@@ -99,7 +101,7 @@ src/translator-minimal.o: src/translator-minimal.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 minimal-translator: src/translator-minimal.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 install-minimal: minimal-translator
 	install -m 755 minimal-translator /hurd/
