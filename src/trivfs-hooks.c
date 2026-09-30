@@ -14,8 +14,9 @@
  *  @brief Implementation of Hurd trivfs translator hooks
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
  *
- *  NOTE: Hook functions are declared as weak symbols so that libtrivfs
- *  can override them with its default implementations when needed.
+ *  NOTE: This file provides implementations of the standard trivfs functions
+ *  (fs_open, fs_read, fs_write) which libtrivfs will call. These functions
+ *  delegate to our custom hook implementations.
  */
 
 #include <stdio.h>
@@ -43,6 +44,7 @@
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
+#include <hurd/trivfs.h>
 #else
 /* Non-Hurd systems */
 typedef unsigned int mach_port_t;
@@ -82,25 +84,6 @@ struct iobuf {
 
 
 /*****************************************************************************
- *  HOOK FUNCTION FORWARD DECLARATIONS (weak symbols)
- *  These are declared as weak so libtrivfs can override them
- *****************************************************************************/
-
-/* Hook implementations - declared as weak symbols */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf)
-    __attribute__((weak));
-
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count)
-    __attribute__((weak));
-
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count)
-    __attribute__((weak));
-
-
-/*****************************************************************************
  *  INCLUDE PROJECT HEADERS
  *****************************************************************************/
 
@@ -115,7 +98,7 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 CompactNeuralNetwork global_network = {0};
 mach_port_t trivfs_control = MACH_PORT_NULL;
 char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
-                "Usage: settrans -c <node> /hurd/sigmoid-neuron-translator";
+                "Usage: settrans -a <node> /hurd/sigmoid-neuron-translator";
 
 
 /*****************************************************************************
@@ -133,60 +116,17 @@ static void __attribute__((constructor)) translator_init(void)
 
 
 /*****************************************************************************
- *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
- *****************************************************************************/
-
-#ifndef ON_HURD
-
-int trivfs_server_loop(void) {
-    log_debug_message("[DEBUG] trivfs_server_loop: STUB - not on Hurd!");
-    return -1;
-}
-
-error_t trivfs_server(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg) {
-    (void)inmsg; (void)outmsg;
-    log_debug_message("[DEBUG] trivfs_server: STUB - not on Hurd!");
-    return -1;
-}
-
-/* On non-Hurd, provide the fs_* functions that would be in libtrivfs */
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node *node, struct iobuf **iobuf)
-{
-    (void)cred; (void)flags; (void)mode; (void)node; (void)iobuf;
-    return ENOSYS;
-}
-
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-               off_t offset, size_t *len, size_t count)
-{
-    (void)cred; (void)iobuf; (void)offset; (void)len; (void)count;
-    return ENOSYS;
-}
-
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                off_t offset, size_t len, size_t count)
-{
-    (void)cred; (void)iobuf; (void)offset; (void)len; (void)count;
-    return ENOSYS;
-}
-
-#endif /* !ON_HURD */
-
-
-/*****************************************************************************
  *  HOOK IMPLEMENTATIONS
- *  These are our actual implementations that libtrivfs will call
- *  via the trivfs interface on Hurd systems.
+ *  These are our custom implementations that do the actual work.
  *****************************************************************************/
 
 /* Open hook implementation */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf)
+static error_t our_fs_open(struct iouser *cred, int flags, mode_t mode,
+                           struct node *node, struct iobuf **iobuf)
 {
     (void)cred; (void)flags; (void)mode; (void)node;
     
-    log_debug_message("[DEBUG] fs_open_hook called");
+    log_debug_message("[DEBUG] our_fs_open called");
     *iobuf = NULL;
     
     if (!global_network.initialized) {
@@ -201,13 +141,13 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
 
 
 /* Read hook implementation */
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count)
+static error_t our_fs_read(struct iouser *cred, struct iobuf *iobuf,
+                          off_t offset, size_t *len, size_t count)
 {
     (void)cred; (void)offset; (void)count;
     
     char debug_msg[256];
-    snprintf(debug_msg, sizeof(debug_msg), "[DEBUG] fs_read_hook called, initialized=%d",
+    snprintf(debug_msg, sizeof(debug_msg), "[DEBUG] our_fs_read called, initialized=%d",
             global_network.initialized);
     log_debug_message(debug_msg);
     
@@ -314,8 +254,8 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
 
 
 /* Write hook implementation */
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count)
+static error_t our_fs_write(struct iouser *cred, struct iobuf *iobuf,
+                           off_t offset, size_t len, size_t count)
 {
     (void)cred; (void)offset; (void)count;
     
@@ -395,24 +335,70 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 
 
 /*****************************************************************************
- *  TRIVFS DEMUXER - Entry point for Hurd translator
- *  This is called by libtrivfs for each message.
- *  libtrivfs will automatically dispatch to our fs_*_hook functions.
+ *  STANDARD TRIVFS FUNCTIONS
+ *  These are the functions that libtrivfs expects and will call.
+ *  We define them to override the default libtrivfs implementations.
+ *  They delegate to our custom implementations above.
  *****************************************************************************/
 
+/* Standard trivfs open function */
+error_t fs_open(struct iouser *cred, int flags, mode_t mode,
+               struct node *node, struct iobuf **iobuf)
+{
+    return our_fs_open(cred, flags, mode, node, iobuf);
+}
+
+/* Standard trivfs read function */
+error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
+               off_t offset, size_t *len, size_t count)
+{
+    return our_fs_read(cred, iobuf, offset, len, count);
+}
+
+/* Standard trivfs write function */
+error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
+                off_t offset, size_t len, size_t count)
+{
+    return our_fs_write(cred, iobuf, offset, len, count);
+}
+
+
+/*****************************************************************************
+ *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
+ *****************************************************************************/
+
+#ifndef ON_HURD
+
+int trivfs_server_loop(void) {
+    log_debug_message("[DEBUG] trivfs_server_loop: STUB - not on Hurd!");
+    return -1;
+}
+
+#else
+/* On Hurd, these are provided by libtrivfs */
+#endif
+
+
+/*****************************************************************************
+ *  TRIVFS DEMUXER - Optional entry point for custom message handling
+ *  For standard libtrivfs usage, we don't need this - libtrivfs provides
+ *  the server loop via trivfs_server() and calls our fs_* functions directly.
+ *  
+ *  However, some Hurd versions expect this symbol to exist. We provide a minimal
+ *  implementation that delegates to libtrivfs.
+ *****************************************************************************/
+
+#ifndef ON_HURD
+/* On non-Hurd systems, we don't have libtrivfs, so we provide a stub */
+int trivfs_server(void) {
+    return -1;
+}
+#endif
+
+/* Minimal demuxer that works with libtrivfs */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
 {
-    log_debug_message("[DEBUG] trivfs_demuxer: Called (Hurd entry point)");
-    
-    if (inmsg == NULL || outmsg == NULL) {
-        return EINVAL;
-    }
-    
-    /* 
-     * On Hurd, libtrivfs handles the message dispatch.
-     * It will call our fs_*_hook functions automatically based on the message type.
-     * We just need to return 0 to indicate we handled the demuxing.
-     */
-    log_debug_message("[DEBUG] trivfs_demuxer: Message received, libtrivfs will dispatch");
+    (void)inmsg; (void)outmsg;
+    /* libtrivfs will call our fs_* functions automatically */
     return 0;
 }

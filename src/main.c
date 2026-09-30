@@ -52,16 +52,16 @@
 int main(void)
 {
     /* On GNU/Hurd, when loaded as a translator by settrans, main() is called
-     * by the Hurd trivfs library, but it should do nothing.
-     * The real work happens in trivfs_demuxer().
-     * We return 0 to indicate success, but the translator continues running
-     * via the trivfs message loop.
+     * and should start the trivfs server, which will handle the message loop
+     * and dispatch to our fs_* functions.
      */
 #ifdef ON_HURD
-    /* On Hurd, main() is called by trivfs startup but should return immediately
-     * The trivfs library will handle the server loop via trivfs_demuxer */
-    log_debug_message("[DEBUG] main(): Called on Hurd - returning immediately, real work in trivfs_demuxer");
-    return 0;  /* Return success - trivfs will handle the rest */
+    /* On Hurd, call trivfs_server() from libtrivfs
+     * This starts the server and handles all message dispatching
+     * It will call our fs_open, fs_read, fs_write functions automatically
+     */
+    log_debug_message("[DEBUG] main(): Starting trivfs_server on Hurd");
+    return trivfs_server();  /* This should not return */
 #else
     /* On non-Hurd systems (like Debian/Linux), display helpful message */
 #ifdef DEBUG
@@ -115,6 +115,4 @@ int main(void)
     
     return result;
 #endif
-    
-    return EXIT_SUCCESS;
 }

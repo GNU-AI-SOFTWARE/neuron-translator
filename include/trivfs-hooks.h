@@ -73,7 +73,15 @@ struct iobuf;
  *  FUNCTION DECLARATIONS
  *****************************************************************************/
 
-/* Hook implementations */
+/* Standard trivfs functions - these are called by libtrivfs */
+error_t fs_open(struct iouser *cred, int flags, mode_t mode,
+                struct node *node, struct iobuf **iobuf);
+error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
+                 off_t offset, size_t *len, size_t count);
+error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
+                  off_t offset, size_t len, size_t count);
+
+/* Hook implementations - our internal implementations */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf);
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
@@ -90,6 +98,18 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
 extern mach_port_t trivfs_control;
 extern char *fs_help;
+
+/*****************************************************************************
+ *  LIBTRIVFS FUNCTIONS
+ *****************************************************************************/
+
+/* Main server function from libtrivfs */
+#ifdef ON_HURD
+#include <hurd/trivfs.h>
+#else
+/* On non-Hurd systems, declare the external function */
+extern int trivfs_server(void);
+#endif
 
 /*****************************************************************************
  *  STUB FUNCTIONS FOR NON-HURD
