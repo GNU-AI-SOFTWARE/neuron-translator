@@ -60,12 +60,12 @@ int main(void)
      * and dispatch to our fs_* functions.
      */
 #if ON_HURD == 1
-    /* On Hurd, when loaded as a translator by settrans, main() is called
-     * and should start the trivfs server from libtrivfs.
-     * trivfs_server() is provided by libtrivfs when linked with -ltrivfs.
+    /* On Hurd, when loaded as a translator by settrans, main() is NOT actually called.
+     * The entry point is handled by libtrivfs via our fs_* functions.
+     * If main() IS called (e.g., when running directly), return 0.
      */
-    log_debug_message("[DEBUG] main(): Starting Hurd trivfs server");
-    return trivfs_server();  /* Should not return - trivfs_server() runs the message loop */
+    log_debug_message("[DEBUG] main(): Hurd translator - main() should not be called by settrans");
+    return 0;
 #else
     /* On non-Hurd systems (like Debian/Linux), display helpful message */
 #ifdef DEBUG

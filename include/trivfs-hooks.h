@@ -121,12 +121,10 @@ extern char *fs_help;
 
 /*****************************************************************************
  *  LIBTRIVFS FUNCTIONS
- *  trivfs_server is provided by libtrivfs on Hurd systems.
- *  We always declare it, and provide a weak fallback implementation.
+ *  On Hurd, libtrivfs provides the server functionality.
+ *  We don't need to declare trivfs_server as it's not called by our code.
+ *  libtrivfs handles the message loop and calls our fs_* functions directly.
  *****************************************************************************/
-
-/* Main server function from libtrivfs (or our weak fallback) */
-extern int trivfs_server(void);
 
 /*****************************************************************************
  *  STUB FUNCTIONS FOR NON-HURD

@@ -390,20 +390,10 @@ int trivfs_server_loop(void) {
     return -1;
 }
 
-/* trivfs_server is provided by libtrivfs on Hurd systems.
- * On non-Hurd systems, we don't need it as we can't run as a translator.
- * 
- * Note: We DO NOT provide a fallback implementation here. If you're on a Hurd
- * system without libtrivfs, you need to install the Hurd development libraries.
- * On non-Hurd systems, this function is never used.
+/* On Hurd systems, libtrivfs provides the trivfs_server functionality.
+ * We don't need to declare or define it in our code.
+ * On non-Hurd systems, we can't run as a translator anyway.
  */
-#if ON_HURD == 1
-/* On Hurd, trivfs_server is provided by libtrivfs */
-extern int trivfs_server(void);
-#else
-/* On non-Hurd, we don't need trivfs_server */
-typedef int dummy_trivfs_server_declaration;
-#endif
 
 
 /*****************************************************************************
