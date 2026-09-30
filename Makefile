@@ -54,11 +54,16 @@ compile: $(OBJS)
 executable: $(TARGET)
 
 $(TARGET): $(OBJS)
-	@echo "Linking with Hurd libraries..."
-	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	# Link with Hurd trivfs library which provides the real entry point handling
-	# On Hurd, libtrivfs will call trivfs_demuxer, not main()
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+	@echo "Linking..."
+	# On Hurd, link with Hurd libraries. On other systems, just link normally.
+	ifeq ($(HURD_SYSTEM),yes)
+		@echo "Linking with Hurd libraries..."
+		@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
+		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -ltrivfs -lfshelp -lports -lshouldbeinlibc
+	else
+		@echo "Linking without Hurd libraries (non-Hurd system)"
+		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	endif
 
 INSTALL_DIR = /hurd
 
@@ -71,8 +76,9 @@ install: $(TARGET)
 	@echo "On GNU/Hurd, proceed with installation..."
 	install -m 755 $(TARGET) $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)/$(TARGET)"
-	@echo "To use: sudo settrans -c /llm $(INSTALL_DIR)/$(TARGET)"
+	@echo "To use: sudo settrans -a /llm $(INSTALL_DIR)/$(TARGET)"
 	@echo "NOTE: This will only work on a running GNU/Hurd system!"
+	@echo "       Use -a flag for automatic startup, -c for manual startup"
 
 uninstall:
 	rm -f $(INSTALL_DIR)/$(TARGET)
