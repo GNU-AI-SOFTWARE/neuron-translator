@@ -29,8 +29,11 @@
  *  HURD DETECTION
  *****************************************************************************/
 
-#if defined(__GNU__) && !defined(__GNU_LIBRARY__)
-#define ON_HURD 1
+/* ON_HURD should be defined by the Makefile via -DON_HURD flag
+ * If compiling manually on Hurd, use: -DON_HURD
+ */
+#ifndef ON_HURD
+#define ON_HURD 0
 #endif
 
 /*****************************************************************************
@@ -39,12 +42,21 @@
  *  On non-Hurd: Provide our own definitions
  *****************************************************************************/
 
-#if defined(ON_HURD)
+#if ON_HURD == 1
+/* Try to include Hurd headers - if they don't exist, we'll use our own definitions */
+#if __has_include(<mach.h>)
 #include <mach.h>
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
-#include <hurd/trivfs.h>
+#else
+/* Hurd headers not available, use our own definitions */
+typedef unsigned int mach_port_t;
+#define MACH_PORT_NULL ((mach_port_t) 0)
+struct mach_msg_header;
+typedef struct mach_msg_header mach_msg_header_t;
+typedef int error_t;
+#endif
 #else
 /* Non-Hurd systems */
 typedef unsigned int mach_port_t;
@@ -365,17 +377,21 @@ error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
+ *  Note: These stubs are provided even on Hurd in case the system
+ *  doesn't have the actual libtrivfs libraries installed.
  *****************************************************************************/
-
-#ifndef ON_HURD
 
 int trivfs_server_loop(void) {
     log_debug_message("[DEBUG] trivfs_server_loop: STUB - not on Hurd!");
     return -1;
 }
 
-#else
-/* On Hurd, these are provided by libtrivfs */
+/* Provide a stub implementation of trivfs_server for systems without libtrivfs */
+#if ON_HURD != 1
+int trivfs_server(void) {
+    log_debug_message("[DEBUG] trivfs_server: STUB - libtrivfs not available");
+    return -1;
+}
 #endif
 
 
@@ -387,13 +403,6 @@ int trivfs_server_loop(void) {
  *  However, some Hurd versions expect this symbol to exist. We provide a minimal
  *  implementation that delegates to libtrivfs.
  *****************************************************************************/
-
-#ifndef ON_HURD
-/* On non-Hurd systems, we don't have libtrivfs, so we provide a stub */
-int trivfs_server(void) {
-    return -1;
-}
-#endif
 
 /* Minimal demuxer that works with libtrivfs */
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)

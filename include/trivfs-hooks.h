@@ -30,8 +30,11 @@
  *  HURD DETECTION
  *****************************************************************************/
 
-#if defined(__GNU__) && !defined(__GNU_LIBRARY__)
-#define ON_HURD 1
+/* ON_HURD should be defined by the Makefile via -DON_HURD flag
+ * If compiling manually on Hurd, use: -DON_HURD
+ */
+#ifndef ON_HURD
+#define ON_HURD 0
 #endif
 
 /*****************************************************************************
@@ -40,11 +43,21 @@
  *  On non-Hurd: Provide our own definitions
  *****************************************************************************/
 
-#if defined(ON_HURD)
+#if ON_HURD == 1
+/* Try to include Hurd headers - if they don't exist, we'll use our own definitions */
+#if __has_include(<mach.h>)
 #include <mach.h>
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
+#else
+/* Hurd headers not available, use our own definitions */
+typedef unsigned int mach_port_t;
+#define MACH_PORT_NULL ((mach_port_t) 0)
+struct mach_msg_header;
+typedef struct mach_msg_header mach_msg_header_t;
+typedef int error_t;
+#endif
 #else
 /* Non-Hurd systems */
 typedef unsigned int mach_port_t;
@@ -93,6 +106,13 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 
 /*****************************************************************************
+ *  STUB FUNCTIONS FOR NON-HURD
+ *****************************************************************************/
+
+/* Stub for non-Hurd systems */
+extern int trivfs_server_loop(void);
+
+/*****************************************************************************
  *  GLOBAL VARIABLES
  *****************************************************************************/
 
@@ -101,15 +121,12 @@ extern char *fs_help;
 
 /*****************************************************************************
  *  LIBTRIVFS FUNCTIONS
+ *  trivfs_server is provided by libtrivfs on Hurd systems.
+ *  On non-Hurd systems, we provide a stub declaration.
  *****************************************************************************/
 
 /* Main server function from libtrivfs */
-#ifdef ON_HURD
-#include <hurd/trivfs.h>
-#else
-/* On non-Hurd systems, declare the external function */
 extern int trivfs_server(void);
-#endif
 
 /*****************************************************************************
  *  STUB FUNCTIONS FOR NON-HURD

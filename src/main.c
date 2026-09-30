@@ -33,6 +33,10 @@
 #include "trivfs-hooks.h"  /* Includes all necessary Hurd/Mach declarations */
 #include "debug.h"
 
+/* Default ON_HURD to 0 if not defined by Makefile */
+#ifndef ON_HURD
+#define ON_HURD 0
+#endif
 
 /*****************************************************************************
  *                                                                           *
@@ -55,7 +59,7 @@ int main(void)
      * and should start the trivfs server, which will handle the message loop
      * and dispatch to our fs_* functions.
      */
-#ifdef ON_HURD
+#if ON_HURD == 1
     /* On Hurd, call trivfs_server() from libtrivfs
      * This starts the server and handles all message dispatching
      * It will call our fs_open, fs_read, fs_write functions automatically
