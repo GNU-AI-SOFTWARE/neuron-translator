@@ -32,20 +32,21 @@ else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
 endif
 
-# For Hurd translators, we use the standard approach:
-# - On Hurd: Use main-hurd.c which calls trivfs_server() from libtrivfs
+# For Hurd translators, we follow the canonical trivfs structure:
+# - On Hurd: main-hurd.c defines main(), which calls trivfs_startup()
+#   and enters the server loop (see trans/null.c in the Hurd sources)
 # - On non-Hurd: Use main.c for testing/compilation only
-# The actual work is done by our fs_open, fs_read, fs_write functions
-# libtrivfs will call these functions automatically when messages are received
+# The work is done by the trivfs_S_* functions in trivfs-hooks.c,
+# called by libtrivfs's trivfs_demuxer for each incoming RPC
 
 # Common source files
 COMMON_SRCS = src/neuron.c src/trivfs-hooks.c
 
-# On Hurd: use main-hurd.c that calls trivfs_server()
-# On non-Hurd: use main.c for testing
+# On Hurd: main-hurd.c provides the translator entry point
+# On non-Hurd: include main.c for testing
 ifeq ($(HURD_SYSTEM),yes)
 SRCS = src/main-hurd.c $(COMMON_SRCS)
-$(info Building for GNU/Hurd - Translator with libtrivfs entry point)
+$(info Building for GNU/Hurd - Translator with trivfs_startup server loop)
 else
 SRCS = src/main.c $(COMMON_SRCS)
 $(info Building for $(UNAME_S) - Including main.c for non-Hurd testing)

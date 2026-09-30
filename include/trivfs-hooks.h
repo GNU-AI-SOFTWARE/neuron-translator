@@ -1,5 +1,5 @@
 /*
- * trivfs-hooks.h - Hurd Translator Hooks for LLM Neuron Translator
+ * trivfs-hooks.h - Hurd Translator Interface for the Neuron Translator
  *
  * Copyright (C) 2026  GNU AI Project
  * Author: Claire <claire@gnu-ai.org>
@@ -11,20 +11,18 @@
  */
 
 /** @file trivfs-hooks.h
- *  @brief Hurd trivfs translator interface declarations
- *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
+ *  @brief Shared declarations for the trivfs translator hooks
  *
- *  NOTE: We provide our own definitions of Hurd types to avoid conflicts
- *  with system headers. The system's <hurd/iohelp.h> only provides partial
- *  definitions (struct iouser is complete, but struct node and struct iobuf
- *  are only forward-declared).
+ *  On GNU/Hurd, the server routines (trivfs_S_io_read, trivfs_S_io_write,
+ *  ...) are declared by <hurd/trivfs.h>; this header only pulls in the
+ *  basic Mach types on Hurd, or provides minimal fallback types so the
+ *  non-Hurd test harness in main.c still compiles.
  */
 
 #ifndef TRIVFS_HOOKS_H
 #define TRIVFS_HOOKS_H
 
 #include <sys/types.h>
-#include <errno.h>  /* For error_t */
 
 /*****************************************************************************
  *  HURD DETECTION
@@ -40,107 +38,49 @@
 /*****************************************************************************
  *  BASIC MACH TYPES
  *  On Hurd: Use system headers
- *  On non-Hurd: Provide our own definitions
+ *  On non-Hurd: Provide our own minimal definitions (test harness only)
  *****************************************************************************/
 
 #if ON_HURD == 1
-/* Try to include Hurd headers - if they don't exist, we'll use our own definitions */
 #if __has_include(<mach.h>)
 #include <mach.h>
 #include <mach/port.h>
 #include <mach/message.h>
 #include <hurd.h>
 #else
-/* Hurd headers not available, use our own definitions */
-typedef unsigned int mach_port_t;
-#define MACH_PORT_NULL ((mach_port_t) 0)
-struct mach_msg_header;
-typedef struct mach_msg_header mach_msg_header_t;
-typedef int error_t;
+#error "ON_HURD is defined but <mach.h> is not available"
 #endif
 #else
-/* Non-Hurd systems */
+/* Non-Hurd systems: minimal types for the main.c test harness */
 typedef unsigned int mach_port_t;
 #define MACH_PORT_NULL ((mach_port_t) 0)
 struct mach_msg_header;
 typedef struct mach_msg_header mach_msg_header_t;
 typedef int error_t;
 #endif
-
-/* mach_msg_header_t is either from system or our typedef above */
-
-/*****************************************************************************
- *  HURD FILESYSTEM TYPES
- *  We always provide our own complete definitions to ensure we can access
- *  members like iobuf->buf. These match the internal libtrivfs types.
- *  Note: We avoid including <hurd/trivfs.h> and <hurd/iohelp.h> as they
- *  cause redefinition conflicts with struct iouser.
- *****************************************************************************/
-
-/* Forward declarations for Hurd types */
-struct iouser;
-struct node;
-struct iobuf;
-
-/*****************************************************************************
- *  FUNCTION DECLARATIONS
- *****************************************************************************/
-
-/* Standard trivfs functions - these are called by libtrivfs */
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-                struct node **node, struct iobuf **iobuf);
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-                 off_t offset, size_t *len, size_t count);
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                  off_t offset, size_t len, size_t count);
-
-/* Hook implementations - our internal implementations */
-error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
-                     struct node *node, struct iobuf **iobuf);
-error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
-                      off_t offset, size_t *len, size_t count);
-error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
-                       off_t offset, size_t len, size_t count);
-
-/* Translator entry point */
-int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
-
-/*****************************************************************************
- *  STUB FUNCTIONS FOR NON-HURD
- *****************************************************************************/
-
-/* Stub for non-Hurd systems */
-extern int trivfs_server_loop(void);
 
 /*****************************************************************************
  *  GLOBAL VARIABLES
  *****************************************************************************/
 
-extern mach_port_t trivfs_control;
-extern char *fs_help;
-
-/*****************************************************************************
- *  LIBTRIVFS FUNCTIONS
- *  On Hurd, libtrivfs provides the server functionality.
- *  We don't need to declare trivfs_server as it's not called by our code.
- *  libtrivfs handles the message loop and calls our fs_* functions directly.
- *****************************************************************************/
-
-/*****************************************************************************
- *  STUB FUNCTIONS FOR NON-HURD
- *****************************************************************************/
-
-#ifndef ON_HURD
-/* Stub functions for non-Hurd systems */
-extern int trivfs_server_loop(void);
-#endif
-
-/*****************************************************************************
- *  NEURAL NETWORK
- *****************************************************************************/
-
+/* The neural network served by the translator (defined in trivfs-hooks.c) */
 #include "neuron.h"
 
 extern CompactNeuralNetwork global_network;
+
+/* Help text (defined in trivfs-hooks.c) */
+extern char *fs_help;
+
+/* Trivfs control port placeholder for the non-Hurd test harness */
+extern mach_port_t trivfs_control;
+
+/*****************************************************************************
+ *  NON-HURD TEST HARNESS
+ *****************************************************************************/
+
+#if ON_HURD != 1
+/* Stub server loop: returns -1 immediately on non-Hurd systems */
+extern int trivfs_server_loop(void);
+#endif
 
 #endif /* TRIVFS_HOOKS_H */

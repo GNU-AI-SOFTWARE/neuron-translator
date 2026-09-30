@@ -1,5 +1,5 @@
 /*
- * trivfs-hooks.c - Hurd Translator Hooks Implementation
+ * trivfs-hooks.c - Hurd Translator Server Routines
  *
  * Copyright (C) 2026  GNU AI Project
  * Author: Claire <claire@gnu-ai.org>
@@ -11,404 +11,592 @@
  */
 
 /** @file trivfs-hooks.c
- *  @brief Implementation of Hurd trivfs translator hooks
- *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
+ *  @brief Implementation of the trivfs server routines
  *
- *  NOTE: This file provides implementations of the standard trivfs functions
- *  (fs_open, fs_read, fs_write) which libtrivfs will call. These functions
- *  delegate to our custom hook implementations.
+ *  libtrivfs demultiplexes incoming RPCs (via its trivfs_demuxer) to the
+ *  trivfs_S_* functions defined in this file.  This structure follows
+ *  the canonical trivfs translators in the Hurd sources (trans/null.c,
+ *  trans/random.c).
+ *
+ *  Because libtrivfs's default trivfs_S_io_read, trivfs_S_io_write,
+ *  trivfs_S_io_readable, trivfs_S_io_seek, trivfs_S_io_select and
+ *  openmode functions abort with an assertion when
+ *  trivfs_support_read/trivfs_support_write are set, we must provide
+ *  our own definitions of all of them.
  */
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#include <errno.h>
 
-/*****************************************************************************
- *  HURD DETECTION
- *****************************************************************************/
-
-/* ON_HURD should be defined by the Makefile via -DON_HURD flag
- * If compiling manually on Hurd, use: -DON_HURD
- */
-#ifndef ON_HURD
-#define ON_HURD 0
-#endif
-
-/*****************************************************************************
- *  BASIC MACH TYPES
- *  On Hurd: Use system headers
- *  On non-Hurd: Provide our own definitions
- *****************************************************************************/
-
-#if ON_HURD == 1
-/* Try to include Hurd headers - if they don't exist, we'll use our own definitions */
-#if __has_include(<mach.h>)
-#include <mach.h>
-#include <mach/port.h>
-#include <mach/message.h>
-#include <hurd.h>
-#else
-/* Hurd headers not available, use our own definitions */
-typedef unsigned int mach_port_t;
-#define MACH_PORT_NULL ((mach_port_t) 0)
-struct mach_msg_header;
-typedef struct mach_msg_header mach_msg_header_t;
-typedef int error_t;
-#endif
-#else
-/* Non-Hurd systems */
-typedef unsigned int mach_port_t;
-#define MACH_PORT_NULL ((mach_port_t) 0)
-struct mach_msg_header;
-typedef struct mach_msg_header mach_msg_header_t;
-typedef int error_t;
-#endif
-
-
-/*****************************************************************************
- *  COMPLETE HURD FILESYSTEM TYPE DEFINITIONS
- *  We provide these ourselves because Hurd headers only forward-declare
- *  struct node and struct iobuf, and we need to access iobuf->buf.
- *  These match the internal libtrivfs type definitions.
- *****************************************************************************/
-
-/* Complete definitions for all Hurd filesystem structures */
-struct iouser {
-    int uid;
-    int gid;
-    int *uids;
-    int *gids;
-    int nuids;
-    int ngids;
-};
-
-struct node {
-    void *data;
-};
-
-struct iobuf {
-    char *buf;
-    size_t size;
-    off_t offset;
-};
-
-
-/*****************************************************************************
- *  INCLUDE PROJECT HEADERS
- *****************************************************************************/
-
+#include "trivfs-hooks.h"
 #include "neuron.h"
 #include "debug.h"
 
-
 /*****************************************************************************
- *  GLOBAL VARIABLES
+ *  GLOBAL STATE
  *****************************************************************************/
 
+/* The network served through the translator node */
 CompactNeuralNetwork global_network = {0};
-mach_port_t trivfs_control = MACH_PORT_NULL;
+
+/* Help text */
 char *fs_help = "LLM Sigmoid Neuron Translator for GNU Hurd\n"
                 "Usage: settrans -a <node> /hurd/sigmoid-neuron-translator";
 
+/* Placeholder used by the non-Hurd test harness */
+mach_port_t trivfs_control = MACH_PORT_NULL;
+
+#if ON_HURD == 1
+
+#include <hurd/trivfs.h>
+#include <hurd/fsys.h>
+#include <hurd/hurd_types.h>
+#include <hurd/io_S.h>
 
 /*****************************************************************************
- *  INITIALIZATION
+ *  TRIVFS VARIABLES
+ *
+ *  These variables are read by libtrivfs to decide which operations to
+ *  allow.  They are documented in <hurd/trivfs.h>.
  *****************************************************************************/
 
-static void __attribute__((constructor)) translator_init(void)
+int trivfs_fstype = FSTYPE_MISC;
+int trivfs_fsid = 0;
+
+int trivfs_support_read = 1;
+int trivfs_support_write = 1;
+int trivfs_support_exec = 0;
+
+int trivfs_allow_open = O_READ | O_WRITE;
+
+/*****************************************************************************
+ *  PER-OPEN STATE
+ *
+ *  Each open of the translator node gets its own file pointer, stored
+ *  in the peropen hook.  The hook variables are function pointers that
+ *  libtrivfs calls when peropens are created and destroyed.
+ *****************************************************************************/
+
+struct peropen_data
 {
-    if (global_network.memory_block == NULL) {
-        memset(&global_network, 0, sizeof(global_network));
-    }
-    trivfs_control = MACH_PORT_NULL;
-    log_debug_message("[DEBUG] Sigmoid Neuron Translator: Constructor ran");
+    loff_t file_pointer;    /* Current read/write position */
+};
+
+static error_t
+peropen_create(struct trivfs_peropen *po)
+{
+    po->hook = calloc(1, sizeof(struct peropen_data));
+    return po->hook != NULL ? 0 : ENOMEM;
 }
 
+static void
+peropen_destroy(struct trivfs_peropen *po)
+{
+    free(po->hook);
+    po->hook = NULL;
+}
+
+/* Install the peropen hooks before main runs, so they are in place
+ * before trivfs_startup is called. */
+static void __attribute__((constructor))
+translator_init(void)
+{
+    trivfs_peropen_create_hook = peropen_create;
+    trivfs_peropen_destroy_hook = peropen_destroy;
+}
 
 /*****************************************************************************
- *  HOOK IMPLEMENTATIONS
- *  These are our custom implementations that do the actual work.
+ *  NETWORK ACCESS
  *****************************************************************************/
 
-/* Open hook implementation - internal version with struct node * */
-static error_t our_fs_open(struct iouser *cred, int flags, mode_t mode,
-                           struct node *node, struct iobuf **iobuf)
+/* Size of the buffer used to render the status text */
+#define INFO_BUFFER_SIZE 4096
+
+/* Initialize the network with the default topology on first use */
+static void
+ensure_network(void)
 {
-    (void)cred; (void)flags; (void)mode; (void)node;
-    
-    log_debug_message("[DEBUG] our_fs_open called");
-    *iobuf = NULL;
-    
     if (!global_network.initialized) {
         uint16_t layers[MAX_LAYERS] = DEFAULT_LAYER_SIZES;
         if (network_init(&global_network, DEFAULT_LAYER_COUNT, layers) != 0) {
-            return EIO;
+            log_debug_message("[DEBUG] network_init failed");
         }
     }
-    
-    return 0;
 }
 
-
-/* Read hook implementation */
-static error_t our_fs_read(struct iouser *cred, struct iobuf *iobuf,
-                          off_t offset, size_t *len, size_t count)
+/* Render the status text served by reads, return its length.
+ * The text is always NUL-terminated within the buffer. */
+static size_t
+build_info_text(char *buffer, size_t buffer_size)
 {
-    (void)cred; (void)offset; (void)count;
-    
-    char debug_msg[256];
-    snprintf(debug_msg, sizeof(debug_msg), "[DEBUG] our_fs_read called, initialized=%d",
-            global_network.initialized);
-    log_debug_message(debug_msg);
-    
-    if (!global_network.initialized) {
-        return EIO;
-    }
-    
-    char buffer[4096];
     size_t written = 0;
-    int snprintf_result;
-    
-    /* Build output */
-    snprintf_result = snprintf(buffer, sizeof(buffer),
-              "LLM Sigmoid Neuron Translator - GNU Hurd\n"
-              "===========================================\n\n");
-    if (snprintf_result < 0) return EIO;
-    written = (size_t)snprintf_result;
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                     "Network: %d layers", global_network.topology.layer_count);
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
+    int result;
+
+    result = snprintf(buffer, buffer_size,
+                      "LLM Sigmoid Neuron Translator - GNU Hurd\n"
+                      "===========================================\n\n");
+    if (result < 0) return 0;
+    written = (size_t)result;
+
+    result = snprintf(buffer + written, buffer_size - written,
+                      "Network: %d layers",
+                      (int) global_network.topology.layer_count);
+    if (result < 0) return written;
+    written += (size_t)result;
+
     for (uint8_t i = 0; i < global_network.topology.layer_count; i++) {
-        snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                          ", %d", global_network.topology.layer_sizes[i]);
-        if (snprintf_result < 0) return EIO;
-        written += (size_t)snprintf_result;
+        result = snprintf(buffer + written, buffer_size - written,
+                          ", %d", (int) global_network.topology.layer_sizes[i]);
+        if (result < 0) return written;
+        written += (size_t)result;
     }
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written, "\n\n");
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                       "Memory: %.2f KB, Neurons: %zu, Weights: %zu\n\n",
-                       (double)global_network.memory_block_size / 1024.0,
-                       global_network.total_neurons,
-                       global_network.total_weights);
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                       "Parameters:\n"
-                       "  Reset Potential: %.2f mV\n"
-                       "  Threshold: %.2f mV\n"
-                       "  Leak Rate: %.2f\n"
-                       "  Refractory: %d steps\n\n",
-                       global_network.topology.reset_potential,
-                       global_network.topology.threshold,
-                       global_network.topology.leak_rate,
-                       global_network.topology.refractory_length);
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                       "Output:\n");
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
+
+    result = snprintf(buffer + written, buffer_size - written, "\n\n");
+    if (result < 0) return written;
+    written += (size_t)result;
+
+    result = snprintf(buffer + written, buffer_size - written,
+                      "Memory: %.2f KB, Neurons: %zu, Weights: %zu\n\n",
+                      (double) global_network.memory_block_size / 1024.0,
+                      global_network.total_neurons,
+                      global_network.total_weights);
+    if (result < 0) return written;
+    written += (size_t)result;
+
+    result = snprintf(buffer + written, buffer_size - written,
+                      "Parameters:\n"
+                      "  Reset Potential: %.2f mV\n"
+                      "  Threshold: %.2f mV\n"
+                      "  Leak Rate: %.2f\n"
+                      "  Refractory: %d steps\n\n",
+                      (double) global_network.topology.reset_potential,
+                      (double) global_network.topology.threshold,
+                      (double) global_network.topology.leak_rate,
+                      (int) global_network.topology.refractory_length);
+    if (result < 0) return written;
+    written += (size_t)result;
+
+    result = snprintf(buffer + written, buffer_size - written, "Output:\n");
+    if (result < 0) return written;
+    written += (size_t)result;
+
     for (size_t i = 0; i < global_network.topology.output_size; i++) {
-        snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                          "  [%zu]: %.6f\n", i, global_network.output_buffer[i]);
-        if (snprintf_result < 0) return EIO;
-        written += (size_t)snprintf_result;
+        result = snprintf(buffer + written, buffer_size - written,
+                          "  [%zu]: %.6f\n", i,
+                          (double) global_network.output_buffer[i]);
+        if (result < 0) return written;
+        written += (size_t)result;
     }
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                       "\nStatistics:\n"
-                       "  Forward Passes: %zu\n"
-                       "  Neuron Activations: %zu\n\n",
-                       global_network.forward_pass_count,
-                       global_network.neuron_activations);
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
-    snprintf_result = snprintf(buffer + written, sizeof(buffer) - written,
-                       "Usage:\n"
-                       "  cat /llm                    - Show info\n"
-                       "  echo '10,20,5' > /llm      - Set topology\n"
-                       "  echo '0.5,0.3,0.8' > /llm  - Set input\n"
-                       "  echo reset > /llm         - Reset network state\n"
-                       "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
-                       "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
-    if (snprintf_result < 0) return EIO;
-    written += (size_t)snprintf_result;
-    
-    if (written >= sizeof(buffer)) {
-        written = sizeof(buffer) - 1;
+
+    result = snprintf(buffer + written, buffer_size - written,
+                      "\nStatistics:\n"
+                      "  Forward Passes: %zu\n"
+                      "  Neuron Activations: %zu\n\n",
+                      global_network.forward_pass_count,
+                      global_network.neuron_activations);
+    if (result < 0) return written;
+    written += (size_t)result;
+
+    result = snprintf(buffer + written, buffer_size - written,
+                      "Usage:\n"
+                      "  cat /llm                    - Show info\n"
+                      "  echo '10,20,5' > /llm      - Set topology\n"
+                      "  echo '0.5,0.3,0.8' > /llm  - Set input\n"
+                      "  echo reset > /llm         - Reset network state\n"
+                      "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
+                      "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
+    if (result < 0) return written;
+    written += (size_t)result;
+
+    if (written >= buffer_size) {
+        written = buffer_size - 1;
     }
     buffer[written] = '\0';
-    
-    if (len == NULL) {
-        return EINVAL;
+
+    return written;
+}
+
+/* Current length of the status text */
+static size_t
+info_text_size(void)
+{
+    char buffer[INFO_BUFFER_SIZE];
+    return build_info_text(buffer, sizeof buffer);
+}
+
+/*****************************************************************************
+ *  MANDATORY TRIVFS HOOKS
+ *****************************************************************************/
+
+/* Present the node as a regular file whose size is the status text */
+void
+trivfs_modify_stat(struct trivfs_protid *cred, struct stat *st)
+{
+    (void) cred;
+
+    st->st_mode &= ~((mode_t) S_IFMT);
+    st->st_mode |= S_IFREG;
+    st->st_size = (loff_t) info_text_size();
+}
+
+/* Someone (settrans -g, shutdown) wants us to go away */
+error_t
+trivfs_goaway(struct trivfs_control *cntl, int flags)
+{
+    (void) cntl;
+    (void) flags;
+
+    exit(0);
+}
+
+/*****************************************************************************
+ *  IO SERVER ROUTINES
+ *
+ *  These override the libtrivfs defaults, which abort with assertions
+ *  when trivfs_support_read/trivfs_support_write are set.
+ *****************************************************************************/
+
+/* Read data from the node.  OFFSET of -1 means read from the object
+ * maintained file pointer. */
+kern_return_t
+trivfs_S_io_read(struct trivfs_protid *cred,
+                 mach_port_t reply,
+                 mach_msg_type_name_t replytype,
+                 data_t *data,
+                 mach_msg_type_number_t *datalen,
+                 loff_t offs,
+                 vm_size_t amount)
+{
+    char buffer[INFO_BUFFER_SIZE];
+    size_t text_len;
+    loff_t position;
+
+    (void) reply;
+    (void) replytype;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+    else if (!(cred->po->openmodes & O_READ))
+        return EBADF;
+
+    ensure_network();
+    text_len = build_info_text(buffer, sizeof buffer);
+
+    /* Resolve the read position */
+    position = offs;
+    if (position == -1) {
+        struct peropen_data *pod = cred->po->hook;
+        position = pod != NULL ? pod->file_pointer : 0;
     }
-    
-    size_t to_copy = (written < *len) ? written : *len;
-    if (to_copy > 0 && iobuf != NULL && iobuf->buf != NULL) {
-        memcpy(iobuf->buf, buffer, to_copy);
+    if (position < 0)
+        position = 0;
+
+    /* End of file */
+    if ((size_t) position >= text_len || amount == 0) {
+        *datalen = 0;
+        return 0;
     }
-    *len = to_copy;
-    
+
+    if (amount > (vm_size_t)(text_len - (size_t) position))
+        amount = (vm_size_t)(text_len - (size_t) position);
+
+    /* Enlarge the reply buffer if the inline one is too small, as in
+     * trans/random.c.  mig deallocates the buffer after the reply. */
+    if (*datalen < amount) {
+        *data = mmap(0, amount, PROT_READ | PROT_WRITE,
+                      MAP_ANON | MAP_PRIVATE, -1, 0);
+        if (*data == MAP_FAILED)
+            return ENOMEM;
+    }
+
+    memcpy(*data, buffer + position, amount);
+    *datalen = (mach_msg_type_number_t) amount;
+
+    /* Advance the object-maintained file pointer */
+    if (offs == -1) {
+        struct peropen_data *pod = cred->po->hook;
+        if (pod != NULL)
+            pod->file_pointer = position + (loff_t) amount;
+    }
+
     return 0;
 }
 
-
-/* Write hook implementation */
-static error_t our_fs_write(struct iouser *cred, struct iobuf *iobuf,
-                           off_t offset, size_t len, size_t count)
+/* Tell how much data can be read without blocking */
+kern_return_t
+trivfs_S_io_readable(struct trivfs_protid *cred,
+                     mach_port_t reply,
+                     mach_msg_type_name_t replytype,
+                     vm_size_t *amount)
 {
-    (void)cred; (void)offset; (void)count;
-    
-    if (len == 0) {
-        return EINVAL;
-    }
-    
-    if (!global_network.initialized) {
-        return EIO;
-    }
-    
-    if (iobuf == NULL || iobuf->buf == NULL) {
-        return EINVAL;
-    }
-    
+    (void) reply;
+    (void) replytype;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+    else if (!(cred->po->openmodes & O_READ))
+        return EBADF;
+
+    *amount = vm_page_size;
+    return 0;
+}
+
+/* Write data to the node: this is how commands are sent */
+kern_return_t
+trivfs_S_io_write(struct trivfs_protid *cred,
+                  mach_port_t reply,
+                  mach_msg_type_name_t replytype,
+                  const_data_t data,
+                  mach_msg_type_number_t datalen,
+                  loff_t offs,
+                  vm_size_t *amt)
+{
     char temp[1024];
-    if (len >= sizeof(temp)) {
-        len = sizeof(temp) - 1;
+    size_t len;
+
+    (void) reply;
+    (void) replytype;
+    (void) offs;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+    else if (!(cred->po->openmodes & O_WRITE))
+        return EBADF;
+
+    if (datalen == 0) {
+        *amt = 0;
+        return 0;
     }
-    
-    memcpy(temp, iobuf->buf, len);
+
+    ensure_network();
+
+    len = datalen;
+    if (len >= sizeof temp)
+        len = sizeof temp - 1;
+
+    memcpy(temp, data, len);
     temp[len] = '\0';
-    
+
     /* Remove trailing newlines */
     char *newline = strchr(temp, '\n');
-    if (newline) *newline = '\0';
+    if (newline != NULL) *newline = '\0';
     newline = strchr(temp, '\r');
-    if (newline) *newline = '\0';
-    
+    if (newline != NULL) *newline = '\0';
+
     /* Handle commands */
-    if (strlen(temp) >= 5 && strncmp(temp, "reset", 5) == 0) {
-        if (temp[5] == '\0' || temp[5] == ' ' || temp[5] == '\t') {
-            network_reset(&global_network);
+    if (strncmp(temp, "reset", 5) == 0
+        && (temp[5] == '\0' || temp[5] == ' ' || temp[5] == '\t')) {
+        network_reset(&global_network);
+        *amt = datalen;
+        return 0;
+    }
+
+    if (strncmp(temp, "save ", 5) == 0) {
+        char *filename = temp + 5;
+        if (*filename != '\0' && network_save(&global_network, filename)) {
+            *amt = datalen;
             return 0;
         }
-    }
-    
-    if (strlen(temp) >= 5 && strncmp(temp, "save ", 5) == 0) {
-        char *filename = temp + 5;
-        if (*filename != '\0') {
-            if (network_save(&global_network, filename)) {
-                return 0;
-            }
-        }
+        *amt = 0;
         return EINVAL;
     }
-    
-    if (strlen(temp) >= 5 && strncmp(temp, "load ", 5) == 0) {
+
+    if (strncmp(temp, "load ", 5) == 0) {
         char *filename = temp + 5;
-        if (*filename != '\0') {
-            if (network_load(&global_network, filename)) {
-                return 0;
-            }
+        if (*filename != '\0' && network_load(&global_network, filename)) {
+            *amt = datalen;
+            return 0;
         }
+        *amt = 0;
         return EINVAL;
     }
-    
-    /* Parse topology */
+
+    /* Parse a topology specification such as "10,20,5" */
     uint16_t layers[MAX_LAYERS];
     int layer_count = parse_config_string(temp, layers, MAX_LAYERS);
-    
+
     if (layer_count > 0) {
         network_free(&global_network);
-        if (network_init(&global_network, layer_count, layers) != 0) {
+        if (network_init(&global_network, (uint8_t) layer_count, layers) != 0) {
+            *amt = 0;
             return EINVAL;
         }
+        *amt = datalen;
         return 0;
     }
-    
-    /* Parse input */
+
+    /* Parse an input vector and run a forward pass */
     if (parse_input_string(&global_network, temp)) {
+        *amt = datalen;
         return 0;
     }
-    
+
+    *amt = 0;
     return EINVAL;
 }
 
+/* Change the current read/write offset */
+kern_return_t
+trivfs_S_io_seek(struct trivfs_protid *cred,
+                 mach_port_t reply,
+                 mach_msg_type_name_t replytype,
+                 loff_t offs,
+                 int whence,
+                 loff_t *new_offs)
+{
+    struct peropen_data *pod;
+
+    (void) reply;
+    (void) replytype;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    pod = cred->po->hook;
+    if (pod == NULL)
+        return EOPNOTSUPP;
+
+    ensure_network();
+
+    switch (whence) {
+    case SEEK_SET:
+        break;
+    case SEEK_CUR:
+        offs += pod->file_pointer;
+        break;
+    case SEEK_END:
+        offs += (loff_t) info_text_size();
+        break;
+    default:
+        return EINVAL;
+    }
+
+    if (offs < 0)
+        return EINVAL;
+
+    pod->file_pointer = offs;
+    *new_offs = offs;
+    return 0;
+}
+
+/* SELECT_TYPE is the bitwise OR of SELECT_READ, SELECT_WRITE, and
+ * SELECT_URG.  We are always ready for reading and writing. */
+kern_return_t
+trivfs_S_io_select(struct trivfs_protid *cred,
+                   mach_port_t reply,
+                   mach_msg_type_name_t replytype,
+                   int *type)
+{
+    (void) reply;
+    (void) replytype;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    if (*type & ~(SELECT_READ | SELECT_WRITE))
+        return EINVAL;
+
+    return 0;
+}
+
+kern_return_t
+trivfs_S_io_select_timeout(struct trivfs_protid *cred,
+                           mach_port_t reply,
+                           mach_msg_type_name_t replytype,
+                           struct timespec ts,
+                           int *type)
+{
+    (void) ts;
+    return trivfs_S_io_select(cred, reply, replytype, type);
+}
+
+/* Truncate: accept and do nothing, the node has no fixed-size storage */
+kern_return_t
+trivfs_S_file_set_size(struct trivfs_protid *cred,
+                       mach_port_t reply,
+                       mach_msg_type_name_t replytype,
+                       loff_t size)
+{
+    (void) reply;
+    (void) replytype;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    if (size < 0)
+        return EINVAL;
+
+    return 0;
+}
+
+/* These routines modify the O_APPEND, O_ASYNC, O_FSYNC, and O_NONBLOCK
+ * bits for the IO object. */
+kern_return_t
+trivfs_S_io_set_all_openmodes(struct trivfs_protid *cred,
+                             mach_port_t reply,
+                             mach_msg_type_name_t replytype,
+                             int mode)
+{
+    (void) reply;
+    (void) replytype;
+    (void) mode;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    return 0;
+}
+
+kern_return_t
+trivfs_S_io_set_some_openmodes(struct trivfs_protid *cred,
+                               mach_port_t reply,
+                               mach_msg_type_name_t replytype,
+                               int bits)
+{
+    (void) reply;
+    (void) replytype;
+    (void) bits;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    return 0;
+}
+
+kern_return_t
+trivfs_S_io_clear_some_openmodes(struct trivfs_protid *cred,
+                                 mach_port_t reply,
+                                 mach_msg_type_name_t replytype,
+                                 int bits)
+{
+    (void) reply;
+    (void) replytype;
+    (void) bits;
+
+    if (cred == NULL)
+        return EOPNOTSUPP;
+
+    return 0;
+}
 
 /*****************************************************************************
- *  STANDARD TRIVFS FUNCTIONS
- *  These are the functions that libtrivfs expects and will call.
- *  We define them to override the default libtrivfs implementations.
- *  They delegate to our custom implementations above.
+ *  NON-HURD FALLBACK
+ *  The translator cannot run without libtrivfs.  These stubs exist only
+ *  so that the main.c test harness links on non-Hurd systems.
  *****************************************************************************/
 
-/* Standard trivfs open function */
-error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node **node, struct iobuf **iobuf)
+#else /* ON_HURD == 1 */
+
+int trivfs_server_loop(void)
 {
-    /* libtrivfs expects struct node **, but our internal function uses struct node *
-     * For now, pass NULL as we don't use the node parameter in our implementation
-     */
-    (void)node;  /* Not used in our implementation */
-    return our_fs_open(cred, flags, mode, NULL, iobuf);
-}
-
-/* Standard trivfs read function */
-error_t fs_read(struct iouser *cred, struct iobuf *iobuf,
-               off_t offset, size_t *len, size_t count)
-{
-    return our_fs_read(cred, iobuf, offset, len, count);
-}
-
-/* Standard trivfs write function */
-error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
-                off_t offset, size_t len, size_t count)
-{
-    return our_fs_write(cred, iobuf, offset, len, count);
-}
-
-
-/*****************************************************************************
- *  STUB IMPLEMENTATIONS FOR NON-HURD SYSTEMS
- *  Note: These stubs are provided even on Hurd in case the system
- *  doesn't have the actual libtrivfs libraries installed.
- *****************************************************************************/
-
-int trivfs_server_loop(void) {
     log_debug_message("[DEBUG] trivfs_server_loop: STUB - not on Hurd!");
     return -1;
 }
 
-/* On Hurd systems, libtrivfs provides the trivfs_server functionality.
- * We don't need to declare or define it in our code.
- * On non-Hurd systems, we can't run as a translator anyway.
- */
-
-
-/*****************************************************************************
- *  TRIVFS DEMUXER - Optional entry point for custom message handling
- *  For standard libtrivfs usage, we don't need this - libtrivfs provides
- *  the server loop via trivfs_server() and calls our fs_* functions directly.
- *  
- *  However, some Hurd versions expect this symbol to exist. We provide a minimal
- *  implementation that delegates to libtrivfs.
- *****************************************************************************/
-
-/* Minimal demuxer that works with libtrivfs */
-int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
-{
-    (void)inmsg; (void)outmsg;
-    /* libtrivfs will call our fs_* functions automatically */
-    return 0;
-}
+#endif /* ON_HURD */
