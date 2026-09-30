@@ -20,27 +20,18 @@
  *  Note: trivfs_server() is provided by libtrivfs when linked with -ltrivfs.
  */
 
-/* On Hurd, we need a main() that starts the trivfs server.
- * The standard approach is to call trivfs_server() from libtrivfs.
- * However, on some Hurd systems, the symbol might be named differently.
- * We use weak symbols to allow the linker to find the correct one.
+/* On Hurd, the main function is called by settrans but should do nothing.
+ * For passive translators, libtrivfs provides the actual server loop via
+ * trivfs_demuxer(). We just need to return 0 from main().
+ * The actual work is done by our fs_open, fs_read, fs_write functions.
  */
-
-/* Try different possible names for the trivfs server function */
-extern int trivfs_server(void) __attribute__((weak));
-extern int _trivfs_server(void) __attribute__((weak));
-extern int trivfs_start(void) __attribute__((weak));
-extern int _hurd_trivfs_server(void) __attribute__((weak));
 
 int
 main(void)
 {
-    /* Try each possible trivfs server function */
-    if (trivfs_server) return trivfs_server();
-    if (_trivfs_server) return _trivfs_server();
-    if (trivfs_start) return trivfs_start();
-    if (_hurd_trivfs_server) return _hurd_trivfs_server();
-    
-    /* If none found, return 0 (translator won't work but won't crash) */
+    /* On Hurd, when loaded as a translator by settrans, main() is called
+     * but should return 0 immediately. The real work is done by libtrivfs
+     * through our trivfs_demuxer() and fs_* functions.
+     */
     return 0;
 }
