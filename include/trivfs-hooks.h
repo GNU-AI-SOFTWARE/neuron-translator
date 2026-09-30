@@ -98,9 +98,6 @@ extern char *fs_help;
 #ifndef ON_HURD
 /* Stub functions for non-Hurd systems */
 extern int trivfs_server_loop(void);
-#else
-/* On Hurd, trivfs_server is provided by libtrivfs */
-extern error_t trivfs_server(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg);
 #endif
 
 /*****************************************************************************

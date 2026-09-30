@@ -13,6 +13,9 @@
 /** @file trivfs-hooks.c
  *  @brief Implementation of Hurd trivfs translator hooks
  *  Style: Claude Delannoy - C23 standard, POSIX compliant, educational.
+ *
+ *  NOTE: Hook functions are declared as weak symbols so that libtrivfs
+ *  can override them with its default implementations when needed.
  */
 
 #include <stdio.h>
@@ -52,10 +55,8 @@ typedef int error_t;
 
 /*****************************************************************************
  *  COMPLETE HURD FILESYSTEM TYPE DEFINITIONS
- *  We provide these ourselves because:
- *  - On Hurd: <hurd/iohelp.h> only provides struct iouser completely,
- *    but struct node and struct iobuf are only forward-declared
- *  - On non-Hurd: We need complete definitions to access iobuf->buf
+ *  We provide these ourselves because Hurd headers only forward-declare
+ *  struct node and struct iobuf, and we need to access iobuf->buf.
  *  These match the internal libtrivfs type definitions.
  *****************************************************************************/
 
@@ -78,6 +79,25 @@ struct iobuf {
     size_t size;
     off_t offset;
 };
+
+
+/*****************************************************************************
+ *  HOOK FUNCTION FORWARD DECLARATIONS (weak symbols)
+ *  These are declared as weak so libtrivfs can override them
+ *****************************************************************************/
+
+/* Hook implementations - declared as weak symbols */
+error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
+                     struct node *node, struct iobuf **iobuf)
+    __attribute__((weak));
+
+error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
+                      off_t offset, size_t *len, size_t count)
+    __attribute__((weak));
+
+error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
+                       off_t offset, size_t len, size_t count)
+    __attribute__((weak));
 
 
 /*****************************************************************************
@@ -156,9 +176,11 @@ error_t fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  HOOK IMPLEMENTATIONS
- *  Using our complete type definitions from above
+ *  These are our actual implementations that libtrivfs will call
+ *  via the trivfs interface on Hurd systems.
  *****************************************************************************/
 
+/* Open hook implementation */
 error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
                      struct node *node, struct iobuf **iobuf)
 {
@@ -178,6 +200,7 @@ error_t fs_open_hook(struct iouser *cred, int flags, mode_t mode,
 }
 
 
+/* Read hook implementation */
 error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
                       off_t offset, size_t *len, size_t count)
 {
@@ -290,6 +313,7 @@ error_t fs_read_hook(struct iouser *cred, struct iobuf *iobuf,
 }
 
 
+/* Write hook implementation */
 error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
                        off_t offset, size_t len, size_t count)
 {
@@ -372,7 +396,8 @@ error_t fs_write_hook(struct iouser *cred, struct iobuf *iobuf,
 
 /*****************************************************************************
  *  TRIVFS DEMUXER - Entry point for Hurd translator
- *  This is the main message handler called by libtrivfs
+ *  This is called by libtrivfs for each message.
+ *  libtrivfs will automatically dispatch to our fs_*_hook functions.
  *****************************************************************************/
 
 int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
@@ -383,16 +408,11 @@ int trivfs_demuxer(mach_msg_header_t *inmsg, mach_msg_header_t *outmsg)
         return EINVAL;
     }
     
-#ifdef ON_HURD
-    /* On Hurd, libtrivfs provides the real trivfs_server function
-       which will call our hook functions (fs_open_hook, fs_read_hook, fs_write_hook)
-       via the trivfs interface. We don't need to do anything here except
-       return 0 to indicate we handled the message, as libtrivfs will
-       dispatch to our hooks based on the message type. */
-    log_debug_message("[DEBUG] trivfs_demuxer: Hurd message received");
+    /* 
+     * On Hurd, libtrivfs handles the message dispatch.
+     * It will call our fs_*_hook functions automatically based on the message type.
+     * We just need to return 0 to indicate we handled the demuxing.
+     */
+    log_debug_message("[DEBUG] trivfs_demuxer: Message received, libtrivfs will dispatch");
     return 0;
-#else
-    log_debug_message("[DEBUG] trivfs_demuxer: STUB - not on Hurd!");
-    return -1;
-#endif
 }
