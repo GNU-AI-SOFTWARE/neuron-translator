@@ -123,22 +123,22 @@ sudo settrans -c /llm /hurd/sigmoid-neuron-translator
 cat /llm
 
 # Configure network (3 layers: input=3, hidden=5, output=2)
-echo "3,5,2" > /llm
+echo '3,5,2' | sudo tee /llm
 
 # Set input and run forward pass
-echo "0.5,0.3,0.8" > /llm
+echo '0.5,0.3,0.8' | sudo tee /llm
 
 # View results
 cat /llm
 
 # Reset network
-echo reset > /llm
+echo 'reset' | sudo tee /llm
 
 # Save network state
-echo 'save /tmp/network.bin' > /llm
+echo 'save /tmp/network.bin' | sudo tee /llm
 
 # Load network state
-echo 'load /tmp/network.bin' > /llm
+echo 'load /tmp/network.bin' | sudo tee /llm
 ```
 
 ---
@@ -212,11 +212,11 @@ void network_forward(CompactNeuralNetwork *net);
 - `trivfs_demuxer()` - Message demultiplexer for Mach IPC
 
 **Command Handling:**
-- Topology configuration: `echo "10,20,5" > /llm`
-- Input data: `echo "0.5,0.3,0.8" > /llm`
-- Network reset: `echo reset > /llm`
-- Save network: `echo 'save /path' > /llm`
-- Load network: `echo 'load /path' > /llm`
+- Topology configuration: `echo '10,20,5' | sudo tee /llm`
+- Input data (values must match the input layer size): `echo 'v1,...,vN' | sudo tee /llm`
+- Network reset: `echo 'reset' | sudo tee /llm`
+- Save network: `echo 'save /path' | sudo tee /llm`
+- Load network: `echo 'load /path' | sudo tee /llm`
 
 ### 5. `src/main.c` - Entry Point
 

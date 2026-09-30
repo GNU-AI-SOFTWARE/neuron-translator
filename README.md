@@ -57,7 +57,27 @@ sudo make install
 sudo mkdir -p /llm
 
 # Set translator
-sudo settrans -c /llm /hurd/sigmoid-neuron-translator
+sudo settrans -cg /llm /hurd/sigmoid-neuron-translator
+
+# Optional: allow writes without sudo (the node is owned by root)
+sudo chmod 666 /llm
+```
+
+### Writing commands to the translator
+
+The `/llm` node is owned by root, so plain redirection as a normal user
+fails with `Permission denied` (and `sudo echo ... > /llm` does not help:
+bash opens the redirection as your own user before sudo runs). Write
+commands through a pipe to `tee`:
+
+```bash
+echo '3,5,2' | sudo tee /llm
+```
+
+Or run `sudo chmod 666 /llm` once, then plain redirection works:
+
+```bash
+echo '3,5,2' > /llm
 ```
 
 ## Usage
@@ -80,10 +100,10 @@ Output includes:
 
 ```bash
 # Set topology (comma or space separated)
-echo "10,20,5" > /llm
+echo '10,20,5' | sudo tee /llm
 
 # Or with spaces
-echo "10 20 5" > /llm
+echo '10 20 5' | sudo tee /llm
 ```
 
 This creates a network with:
@@ -95,7 +115,8 @@ This creates a network with:
 
 ```bash
 # Set input values (comma or space separated)
-echo "0.5,0.3,0.8,0.1,0.9,0.2,0.4,0.6,0.0,0.7" > /llm
+# The number of values must exactly match the input layer size
+echo '0.5,0.3,0.8,0.1,0.9,0.2,0.4,0.6,0.0,0.7' | sudo tee /llm
 ```
 
 The input must match the number of neurons in the input layer. When input is provided, the forward pass is automatically executed, and the output is available for reading.
@@ -104,24 +125,24 @@ The input must match the number of neurons in the input layer. When input is pro
 
 ```bash
 # Configure network
-echo "3,5,2" > /llm
+echo '3,5,2' | sudo tee /llm
 
 # View configuration
 cat /llm
 # Output shows: 3 layers, sizes 3-5-2, etc.
 
-# Set input
-echo "0.5,0.3,0.8" > /llm
+# Set input (3 values for a 3-neuron input layer)
+echo '0.5,0.3,0.8' | sudo tee /llm
 
 # View output (automatically updated)
 cat /llm
 # Output shows new output values
 
 # Change topology
-echo "5,10,3" > /llm
+echo '5,10,3' | sudo tee /llm
 
-# Set new input
-echo "0.1,0.2,0.3,0.4,0.5" > /llm
+# Set new input (now 5 values)
+echo '0.1,0.2,0.3,0.4,0.5' | sudo tee /llm
 
 # View results
 cat /llm
@@ -349,7 +370,7 @@ If you encounter compilation errors:
 
 1. **settrans fails**: Make sure the translator binary is in `/hurd/` or specify the full path.
 
-2. **Permission denied**: Use `sudo` for settrans and file operations.
+2. **Permission denied on writes**: The node enforces the underlying file's permissions. Write via `echo '...' | sudo tee /llm`, or run `sudo chmod 666 /llm` once. Note that `sudo echo ... > /llm` does not work: bash performs the redirection as your own user before sudo runs.
 
 3. **Translator not responding**: Check that the translator is running with `ps aux | grep sigmoid-neuron-translator`.
 

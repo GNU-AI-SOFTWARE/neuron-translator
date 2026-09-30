@@ -208,12 +208,15 @@ build_info_text(char *buffer, size_t buffer_size)
 
     result = snprintf(buffer + written, buffer_size - written,
                       "Usage:\n"
-                      "  cat /llm                    - Show info\n"
-                      "  echo '10,20,5' > /llm      - Set topology\n"
-                      "  echo '0.5,0.3,0.8' > /llm  - Set input\n"
-                      "  echo reset > /llm         - Reset network state\n"
-                      "  echo 'save /tmp/net.bin' > /llm  - Save network\n"
-                      "  echo 'load /tmp/net.bin' > /llm  - Load network\n");
+                      "  cat /llm                          - Show info\n"
+                      "  echo '10,20,5' | sudo tee /llm  - Set topology\n"
+                      "  echo 'v1,...,v%u' | sudo tee /llm - Set input (%u values)\n"
+                      "  echo 'reset' | sudo tee /llm      - Reset network state\n"
+                      "  echo 'save /tmp/net.bin' | sudo tee /llm - Save network\n"
+                      "  echo 'load /tmp/net.bin' | sudo tee /llm - Load network\n"
+                      "(node owned by root: use '| sudo tee', or 'sudo chmod 666 /llm' once)\n",
+                      (unsigned) global_network.topology.input_size,
+                      (unsigned) global_network.topology.input_size);
     if (result < 0) return written;
     written += (size_t)result;
 
