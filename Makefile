@@ -32,12 +32,23 @@ else
 $(info Building for $(UNAME_S) - ON_HURD not defined)
 endif
 
-# For Hurd translators, we need to include main.c but it should return immediately
-# The actual entry point for trivfs translators is trivfs_demuxer
-# libtrivfs will handle the startup, not main()
-# So we always include main.c but with proper Hurd detection inside
-SRCS = src/main.c src/neuron.c src/trivfs-hooks.c
-$(info Building with all source files - main.c will handle Hurd detection internally)
+# For Hurd translators, we use a passive translator approach:
+# - On Hurd: Don't include main.o (libtrivfs provides its own entry point)
+# - On non-Hurd: Include main.o for testing/compilation
+# The actual work is done by our fs_open, fs_read, fs_write functions
+
+# Common source files
+COMMON_SRCS = src/neuron.c src/trivfs-hooks.c
+
+# On Hurd, we don't need main.c for passive translators
+ifeq ($(HURD_SYSTEM),yes)
+SRCS = $(COMMON_SRCS)
+$(info Building for GNU/Hurd - Passive translator (no main.c))
+else
+SRCS = src/main.c $(COMMON_SRCS)
+$(info Building for $(UNAME_S) - Including main.c for non-Hurd)
+endif
+
 OBJS = $(SRCS:.c=.o)
 INCLUDES = -Iinclude
 
