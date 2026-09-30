@@ -54,10 +54,13 @@ mach_port_t trivfs_control = MACH_PORT_NULL;
 
 #if ON_HURD == 1
 
+/* <hurd/trivfs.h> pulls in <hurd/iohelp.h> and thus <hurd/hurd_types.h>,
+ * which defines data_t, const_data_t and the SELECT_* bits.  The mig
+ * generated server headers (hurd/io_S.h) are not installed on every
+ * system; like trans/random.c we rely on trivfs.h alone. */
 #include <hurd/trivfs.h>
 #include <hurd/fsys.h>
 #include <hurd/hurd_types.h>
-#include <hurd/io_S.h>
 
 /*****************************************************************************
  *  TRIVFS VARIABLES
