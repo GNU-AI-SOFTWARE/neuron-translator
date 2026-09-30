@@ -33,17 +33,17 @@ $(info Building for $(UNAME_S) - ON_HURD not defined)
 endif
 
 # For Hurd translators, we use a passive translator approach:
-# - On Hurd: Use stub main-hurd.c (provides required main symbol)
+# - On Hurd: No main() needed (libtrivfs provides it, -nostartfiles used)
 # - On non-Hurd: Use main.c for testing/compilation
 # The actual work is done by our fs_open, fs_read, fs_write functions
 
 # Common source files
 COMMON_SRCS = src/neuron.c src/trivfs-hooks.c
 
-# On Hurd, use stub main-hurd.c; on other systems, use main.c
+# On Hurd, no main.c needed; on other systems, include main.c
 ifeq ($(HURD_SYSTEM),yes)
-SRCS = src/main-hurd.c $(COMMON_SRCS)
-$(info Building for GNU/Hurd - Passive translator (with stub main))
+SRCS = $(COMMON_SRCS)
+$(info Building for GNU/Hurd - Passive translator (no main, using -nostartfiles))
 else
 SRCS = src/main.c $(COMMON_SRCS)
 $(info Building for $(UNAME_S) - Including main.c for non-Hurd)
@@ -65,7 +65,11 @@ executable: $(TARGET)
 $(TARGET): $(OBJS)
 	@echo "Linking..."
 	@echo "Note: If you get 'cannot find -lhurdsig' or similar, you need to install Hurd development libraries"
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	ifeq ($(HURD_SYSTEM),yes)
+		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread -Wl,-nostartfiles
+	else
+		$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	endif
 
 INSTALL_DIR = /hurd
 
