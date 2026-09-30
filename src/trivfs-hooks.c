@@ -387,14 +387,18 @@ int trivfs_server_loop(void) {
 }
 
 /* trivfs_server is provided by libtrivfs on Hurd systems.
- * On non-Hurd systems, we don't need it as we can't run as a translator.
- */
-#if ON_HURD != 1
-/* On non-Hurd systems, we don't have libtrivfs, so trivfs_server is not available
- * This is fine because we can't run as a translator on non-Hurd anyway.
+ * On systems where libtrivfs is not available, we provide a weak fallback.
+ * The weak attribute ensures that if libtrivfs provides trivfs_server,
+ * the linker will use that version instead of ours.
  */
 int trivfs_server(void) __attribute__((weak));
-#endif
+int trivfs_server(void) {
+    /* Fallback for when libtrivfs is not linked.
+     * This should never be called on a proper GNU/Hurd system with libtrivfs.
+     * On non-Hurd systems (like Debian/Linux), this translator cannot run anyway.
+     */
+    return 0;  /* Return 0 to avoid immediate death, but translator won't work */
+}
 
 
 /*****************************************************************************
