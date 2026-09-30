@@ -132,7 +132,7 @@ static void __attribute__((constructor)) translator_init(void)
  *  These are our custom implementations that do the actual work.
  *****************************************************************************/
 
-/* Open hook implementation */
+/* Open hook implementation - internal version with struct node * */
 static error_t our_fs_open(struct iouser *cred, int flags, mode_t mode,
                            struct node *node, struct iobuf **iobuf)
 {
@@ -355,9 +355,13 @@ static error_t our_fs_write(struct iouser *cred, struct iobuf *iobuf,
 
 /* Standard trivfs open function */
 error_t fs_open(struct iouser *cred, int flags, mode_t mode,
-               struct node *node, struct iobuf **iobuf)
+               struct node **node, struct iobuf **iobuf)
 {
-    return our_fs_open(cred, flags, mode, node, iobuf);
+    /* libtrivfs expects struct node **, but our internal function uses struct node *
+     * For now, pass NULL as we don't use the node parameter in our implementation
+     */
+    (void)node;  /* Not used in our implementation */
+    return our_fs_open(cred, flags, mode, NULL, iobuf);
 }
 
 /* Standard trivfs read function */
@@ -387,18 +391,19 @@ int trivfs_server_loop(void) {
 }
 
 /* trivfs_server is provided by libtrivfs on Hurd systems.
- * On systems where libtrivfs is not available, we provide a weak fallback.
- * The weak attribute ensures that if libtrivfs provides trivfs_server,
- * the linker will use that version instead of ours.
+ * On non-Hurd systems, we don't need it as we can't run as a translator.
+ * 
+ * Note: We DO NOT provide a fallback implementation here. If you're on a Hurd
+ * system without libtrivfs, you need to install the Hurd development libraries.
+ * On non-Hurd systems, this function is never used.
  */
-int trivfs_server(void) __attribute__((weak));
-int trivfs_server(void) {
-    /* Fallback for when libtrivfs is not linked.
-     * This should never be called on a proper GNU/Hurd system with libtrivfs.
-     * On non-Hurd systems (like Debian/Linux), this translator cannot run anyway.
-     */
-    return 0;  /* Return 0 to avoid immediate death, but translator won't work */
-}
+#if ON_HURD == 1
+/* On Hurd, trivfs_server is provided by libtrivfs */
+extern int trivfs_server(void);
+#else
+/* On non-Hurd, we don't need trivfs_server */
+typedef int dummy_trivfs_server_declaration;
+#endif
 
 
 /*****************************************************************************
