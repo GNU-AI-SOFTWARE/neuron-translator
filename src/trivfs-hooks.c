@@ -386,23 +386,15 @@ int trivfs_server_loop(void) {
     return -1;
 }
 
-/* Provide a fallback implementation of trivfs_server
- * On Hurd with libtrivfs installed, the linker will use the library's version instead.
- * This fallback is used when:
- * - We're not on Hurd (Debian/Linux)
- * - We're on Hurd but libtrivfs is not available
- * - We're compiling without linking to libtrivfs
+/* trivfs_server is provided by libtrivfs on Hurd systems.
+ * On non-Hurd systems, we don't need it as we can't run as a translator.
+ */
+#if ON_HURD != 1
+/* On non-Hurd systems, we don't have libtrivfs, so trivfs_server is not available
+ * This is fine because we can't run as a translator on non-Hurd anyway.
  */
 int trivfs_server(void) __attribute__((weak));
-int trivfs_server(void) {
-    /* Fallback implementation for systems without libtrivfs */
-    log_debug_message("[DEBUG] trivfs_server: Fallback implementation - libtrivfs not linked");
-    
-    /* On Hurd, this should never be called if libtrivfs is properly linked.
-     * On non-Hurd systems, this is expected to be called.
-     */
-    return -1;
-}
+#endif
 
 
 /*****************************************************************************

@@ -122,11 +122,13 @@ extern char *fs_help;
 /*****************************************************************************
  *  LIBTRIVFS FUNCTIONS
  *  trivfs_server is provided by libtrivfs on Hurd systems.
- *  On non-Hurd systems, we provide a stub declaration.
+ *  On non-Hurd systems, we don't declare it as we can't link with libtrivfs.
  *****************************************************************************/
 
+#if ON_HURD == 1
 /* Main server function from libtrivfs */
 extern int trivfs_server(void);
+#endif
 
 /*****************************************************************************
  *  STUB FUNCTIONS FOR NON-HURD
