@@ -298,7 +298,9 @@ void network_forward(CompactNeuralNetwork *net)
         size_t prev_offset = net->layer_offsets[layer - 1];
         size_t curr_offset = net->layer_offsets[layer];
         
-        /* Calculate weight offset for this layer */
+        /* Walk the layer table to find where this layer's weight matrix
+         * starts.  The running sum adds up the sizes of all the weight
+         * matrices that precede layer. */
         size_t weight_offset = 0;
         for (int l = 1; l < layer; l++) {
             weight_offset += (size_t)net->topology.layer_sizes[l] *
@@ -312,7 +314,9 @@ void network_forward(CompactNeuralNetwork *net)
             /* Start with bias */
             float sum = net->biases[bias_offset + n];
             
-            /* Add weighted sum of previous layer */
+            /* Dot product of the previous layer's activations (v) with
+             * this neuron's row of the weight matrix (w): the heart of
+             * the forward pass. */
             float *w = net->weights + weight_offset + n * prev_size;
             float *v = net->voltages + prev_offset;
             
@@ -447,7 +451,7 @@ bool network_save(const CompactNeuralNetwork *net, const char *filename)
     if (!fp)
         return false;
 
-    /* --- Başlık --- */
+    /* --- File header: magic number and format version --- */
     uint32_t magic   = NET_FILE_MAGIC;
     uint16_t version = NET_FILE_VERSION;
     if (fwrite(&magic,   sizeof(magic),   1, fp) != 1) { fclose(fp); return false; }
@@ -520,13 +524,15 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
     if (!fp)
         return false;
 
-    /* Her şeyi GEÇİCİ değişkenlere oku, doğrula, en son net'e yaz. */
+    /* Load as a transaction: read everything into LOCAL variables, validate
+     * each field, and only commit the result to *net as the very last step.
+     * A half-loaded or inconsistent network must never become visible. */
     uint32_t         magic   = 0;
     uint16_t         version = 0;
     NetworkTopology  topo;
     void            *block   = NULL;
 
-    /* ---- 1. Başlık ---- */
+    /* ---- 1. File header ---- */
     if (fread(&magic,   sizeof(magic),   1, fp) != 1) goto fail;
     if (fread(&version, sizeof(version), 1, fp) != 1) goto fail;
     if (magic != NET_FILE_MAGIC || version != NET_FILE_VERSION) {
@@ -536,7 +542,7 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
 
     if (fread(&topo, sizeof(topo), 1, fp) != 1) goto fail;
 
-    /* ---- 2. Topolojiyi doğrula (veri okumadan ÖNCE) ---- */
+    /* ---- 2. Validate the topology BEFORE using any of it ---- */
     if (topo.layer_count < 2 || topo.layer_count > MAX_LAYERS) {
         errno = EINVAL;
         goto fail;
@@ -558,12 +564,14 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         goto fail;
     }
 
-    /* Ağırlık ve bias sayılarını katman tablosundan YENİDEN hesapla */
+    /* Recompute the weight and bias totals from the layer table: a file
+     * is never allowed to tell us how large it is, we always derive the
+     * sizes ourselves from the topology. */
     size_t total_weights = 0;
     size_t total_biases  = 0;
     for (uint8_t i = 1; i < topo.layer_count; i++) {
         size_t w = (size_t)topo.layer_sizes[i] * topo.layer_sizes[i - 1];
-        if (total_weights + w < total_weights) {  /* taşma kontrolü */
+        if (total_weights + w < total_weights) {  /* overflow check */
             errno = EOVERFLOW;
             goto fail;
         }
@@ -571,7 +579,7 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         total_biases  += topo.layer_sizes[i];
     }
 
-    /* Global üst sınırlar */
+    /* Enforce the global upper limits */
     if (total_neurons > NET_MAX_TOTAL_NEURONS ||
         total_weights > NET_MAX_TOTAL_WEIGHTS ||
         total_biases  > NET_MAX_TOTAL_BIASES) {
@@ -579,7 +587,7 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         goto fail;
     }
 
-    /* ---- 3. Dosyadaki sayılar bizim hesabımızla uyuşuyor mu? ---- */
+    /* ---- 3. Do the counts stored in the file match our own? ---- */
     size_t f_neurons = 0, f_weights = 0, f_biases = 0;
     if (fread(&f_neurons, sizeof(size_t), 1, fp) != 1) goto fail;
     if (fread(&f_weights, sizeof(size_t), 1, fp) != 1) goto fail;
@@ -592,7 +600,7 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         goto fail;
     }
 
-    /* ---- 4. Offset tablolarını GEÇİCİ dizilere oku ---- */
+    /* ---- 4. Read the offset tables into TEMPORARY arrays ---- */
     size_t layer_offsets [MAX_LAYERS];
     size_t weight_offsets[MAX_LAYERS];
     size_t bias_offsets  [MAX_LAYERS];
@@ -609,7 +617,8 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
     if (fread(bias_offsets, sizeof(size_t),
               topo.layer_count, fp) != topo.layer_count) goto fail;
 
-    /* Offset'lerin monotonik olduğunu doğrula (defansif) */
+    /* Defensive check: each layer must start strictly after the previous
+     * one, i.e. the offsets must grow monotonically. */
     for (uint8_t i = 1; i < topo.layer_count; i++) {
         if (layer_offsets[i] <= layer_offsets[i - 1] ||
             bias_offsets[i]  <= bias_offsets[i - 1]) {
@@ -623,7 +632,7 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         goto fail;
     }
 
-    /* ---- 5. Arena boyutunu TAŞMA KONTROLLÜ hesapla ---- */
+    /* ---- 5. Compute the arena size, guarding against overflow ---- */
     const size_t elem = sizeof(float);
     if (total_neurons > SIZE_MAX / elem ||
         total_weights > SIZE_MAX / elem ||
@@ -645,7 +654,8 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
         goto fail;
     }
 
-    /* Geçici işaretçiler */
+    /* Carve the freshly allocated arena into its five data areas, in
+     * exactly the layout documented in neuron.h. */
     char  *p     = (char *)block;
     float *volt  = (float *)p; p += total_neurons * elem;
     float *wts   = (float *)p; p += total_weights * elem;
@@ -653,12 +663,12 @@ bool network_load(CompactNeuralNetwork *net, const char *filename)
     float *inb   = (float *)p; p += (size_t)topo.input_size  * elem;
     float *outb  = (float *)p;
 
-    /* ---- 6. Veri dizilerini oku ---- */
+    /* ---- 6. Read the data arrays ---- */
     if (fread(volt, elem, total_neurons, fp) != total_neurons) goto fail_block;
     if (fread(wts,  elem, total_weights, fp) != total_weights) goto fail_block;
     if (fread(bs,   elem, total_biases,  fp) != total_biases ) goto fail_block;
 
-    /* ---- 7. Sonda çöp var mı? ---- */
+    /* ---- 7. Reject trailing garbage after the declared data ---- */
     if (fgetc(fp) != EOF) {
         errno = EINVAL;
         goto fail_block;

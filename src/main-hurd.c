@@ -37,20 +37,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Trivfs gereksinimleri: Varsayılan port sınıfları ve kontrol yapıları */
+/* trivfs requirement: the control structure filled in by trivfs_startup(),
+ * which holds the port buckets libtrivfs serves our RPCs through. */
 struct trivfs_control *fsys;
 
 const char *argp_program_version = "sigmoid-neuron-0.1";
 const char *argp_program_bug_address = "<claire@gnu-ai.org>";
 static char doc[] = "GNU/Hurd sigmoid neuron translator.";
 
-/* Komut satırı opsiyonları */
+/* Command-line options accepted by the translator */
 static struct argp_option options[] = {
   {"bias", 'b', "FLOAT", 0, "Initial bias value for the neuron", 0},
   { 0 }
 };
 
-/* Nöron başlangıç parametreleri */
+/* Initial neuron parameter, set by the --bias option */
 float global_bias = 0.0f;
 
 static error_t
@@ -79,21 +80,24 @@ main (int argc, char *argv[])
   error_t err;
   mach_port_t bootstrap;
 
-  /* Argümanları ayrıştır */
+  /* Parse the command line: settrans passes any arguments that follow
+     the translator path on to us. */
   argp_parse (&argp, argc, argv, 0, 0, 0);
 
-  /* Parent (settrans) tarafından sağlanan bootstrap portunu al */
+  /* Get the bootstrap port that the parent (settrans) handed us */
   task_get_bootstrap_port (mach_task_self (), &bootstrap);
   if (bootstrap == MACH_PORT_NULL)
     error (1, 0, "Must be started as a translator");
 
-  /* Trivfs sunucusunu başlat */
+  /* Start the trivfs server: this replies to settrans, telling it the
+     translator is up, and returns our control port in FSYS. */
   err = trivfs_startup (bootstrap, 0, 0, 0, 0, 0, &fsys);
   mach_port_deallocate (mach_task_self (), bootstrap);
   if (err)
     error (3, err, "Contacting parent failed");
 
-  /* RPC isteklerini dinleme döngüsüne gir */
+  /* Enter the server loop: receive incoming RPCs forever and let
+     trivfs_demuxer dispatch them to our trivfs_S_* hooks. */
   ports_manage_port_operations_one_thread (fsys->pi.bucket,
                                             trivfs_demuxer, 0);
 
