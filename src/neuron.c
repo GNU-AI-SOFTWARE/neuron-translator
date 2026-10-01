@@ -45,8 +45,9 @@
  *                                                                           *
  *  Caller contract:                                                         *
  *  ----------------                                                         *
- *    CompactNeuralNetwork net = {0};   /* zero-init on first use */         *
- *    if (!network_load(&net, path))    { /* check errno */ }                *
+ *    CompactNeuralNetwork net = {0};   (zero-init on first use)             *
+ *    if (!network_load(&net, path))    (check errno)                         *
+ *                                                                           *
  *                                                                           *
  *****************************************************************************/
 

@@ -56,6 +56,8 @@ float global_bias = 0.0f;
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
+  (void) state;                 /* Unused: no ARGP_KEY_ handling needs it */
+
   switch (key)
     {
     case 'b':
@@ -69,7 +71,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
-static struct argp argp = { options, parse_opt, 0, doc };
+static struct argp argp = { options, parse_opt, 0, doc, 0, 0, 0 };
 
 int
 main (int argc, char *argv[])
