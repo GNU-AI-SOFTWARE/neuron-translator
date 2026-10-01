@@ -34,6 +34,14 @@
  *  Neural network parameters and limits for memory-efficient implementation  *
  *                                                                           *
  *****************************************************************************/
+/* --- Model dosya formatı --- */
+#define NET_FILE_MAGIC     0x4E455552u   /* 'N' 'E' 'U' 'R' */
+#define NET_FILE_VERSION   1u
+
+/* --- Güvenli üst sınırlar (fuzz/kötü niyetli dosya koruması) --- */
+#define NET_MAX_TOTAL_NEURONS  (16u  * 1024u * 1024u)   /* 16M  */
+#define NET_MAX_TOTAL_WEIGHTS  (256u * 1024u * 1024u)   /* 256M */
+#define NET_MAX_TOTAL_BIASES   NET_MAX_TOTAL_NEURONS
 
 /** Maximum number of layers in the neural network */
 #define MAX_LAYERS 8
