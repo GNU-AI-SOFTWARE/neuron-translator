@@ -18,6 +18,38 @@
  *  comments explaining each algorithmic step.
  */
 
+/*****************************************************************************
+ *                                                                           *
+ *                      MODEL PERSISTENCE — LOAD                             *
+ *                                                                           *
+ *  Reconstructs a network from a .nn file written by network_save().        *
+ *                                                                           *
+ *  Every field read from disk is treated as UNTRUSTED input. The load is    *
+ *  performed as a transaction: nothing is written into @p net until the     *
+ *  whole file has been validated and the arena allocated. On any error      *
+ *  @p net is left in its previous state.                                    *
+ *                                                                           *
+ *  Security rationale (Hurd translator context):                            *
+ *  ------------------------------------------------                         *
+ *  A translator may be started by any user via settrans(8). If the model    *
+ *  file is attacker-controlled, a naive fread()-into-struct loader can      *
+ *  cause:                                                                   *
+ *    - stack/heap buffer overflow via oversized layer_count,                *
+ *    - integer overflow in the arena size computation,                      *
+ *    - heap overflow when fread() writes past a too-small allocation.       *
+ *                                                                           *
+ *  This implementation closes all three classes by:                         *
+ *    (a) validating layer_count against MAX_LAYERS before any array write,  *
+ *    (b) recomputing totals from the topology and cross-checking them,      *
+ *    (c) using overflow-safe size arithmetic and NET_MAX_TOTAL_* guards.    *
+ *                                                                           *
+ *  Caller contract:                                                         *
+ *  ----------------                                                         *
+ *    CompactNeuralNetwork net = {0};   /* zero-init on first use */         *
+ *    if (!network_load(&net, path))    { /* check errno */ }                *
+ *                                                                           *
+ *****************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -405,15 +437,20 @@ bool parse_input_string(CompactNeuralNetwork *net,
  *                                                                           *
  *****************************************************************************/
 
-bool network_save(const CompactNeuralNetwork *net,
-                 const char *filename)
+bool network_save(const CompactNeuralNetwork *net, const char *filename)
 {
-    if (!net || !net->initialized || !filename) {
+    if (!net || !net->initialized || !filename)
         return false;
-    }
-    
+
     FILE *fp = fopen(filename, "wb");
-    if (!fp) return false;
+    if (!fp)
+        return false;
+
+    /* --- Başlık --- */
+    uint32_t magic   = NET_FILE_MAGIC;
+    uint16_t version = NET_FILE_VERSION;
+    if (fwrite(&magic,   sizeof(magic),   1, fp) != 1) { fclose(fp); return false; }
+    if (fwrite(&version, sizeof(version), 1, fp) != 1) { fclose(fp); return false; }
     
     /* Write topology */
     if (fwrite(&net->topology, sizeof(NetworkTopology), 1, fp) != 1) {
@@ -471,105 +508,195 @@ bool network_save(const CompactNeuralNetwork *net,
 }
 
 
-bool network_load(CompactNeuralNetwork *net,
-                 const char *filename)
+bool network_load(CompactNeuralNetwork *net, const char *filename)
 {
-    if (!net || !filename) return false;
-    
+    if (!net || !filename) {
+        errno = EINVAL;
+        return false;
+    }
+
     FILE *fp = fopen(filename, "rb");
-    if (!fp) return false;
-    
-    /* Free existing network */
-    network_free(net);
-    
-    /* Read topology */
-    if (fread(&net->topology, sizeof(NetworkTopology), 1, fp) != 1) {
-        fclose(fp); return false;
+    if (!fp)
+        return false;
+
+    /* Her şeyi GEÇİCİ değişkenlere oku, doğrula, en son net'e yaz. */
+    uint32_t         magic   = 0;
+    uint16_t         version = 0;
+    NetworkTopology  topo;
+    void            *block   = NULL;
+
+    /* ---- 1. Başlık ---- */
+    if (fread(&magic,   sizeof(magic),   1, fp) != 1) goto fail;
+    if (fread(&version, sizeof(version), 1, fp) != 1) goto fail;
+    if (magic != NET_FILE_MAGIC || version != NET_FILE_VERSION) {
+        errno = EINVAL;
+        goto fail;
     }
-    
-    /* Read counts */
-    if (fread(&net->total_neurons, sizeof(size_t), 1, fp) != 1) {
-        fclose(fp); return false;
+
+    if (fread(&topo, sizeof(topo), 1, fp) != 1) goto fail;
+
+    /* ---- 2. Topolojiyi doğrula (veri okumadan ÖNCE) ---- */
+    if (topo.layer_count < 2 || topo.layer_count > MAX_LAYERS) {
+        errno = EINVAL;
+        goto fail;
     }
-    if (fread(&net->total_weights, sizeof(size_t), 1, fp) != 1) {
-        fclose(fp); return false;
+
+    size_t total_neurons = 0;
+    for (uint8_t i = 0; i < topo.layer_count; i++) {
+        uint16_t s = topo.layer_sizes[i];
+        if (s == 0 || s > MAX_NEURONS_PER_LAYER) {
+            errno = EINVAL;
+            goto fail;
+        }
+        total_neurons += s;
     }
-    if (fread(&net->total_biases, sizeof(size_t), 1, fp) != 1) {
-        fclose(fp); return false;
+
+    if (topo.input_size  != topo.layer_sizes[0] ||
+        topo.output_size != topo.layer_sizes[topo.layer_count - 1]) {
+        errno = EINVAL;
+        goto fail;
     }
-    
-    /* Read offsets */
-    if (fread(net->layer_offsets, sizeof(size_t),
-              net->topology.layer_count, fp) != net->topology.layer_count) {
-        network_free(net);
-        fclose(fp); return false;
+
+    /* Ağırlık ve bias sayılarını katman tablosundan YENİDEN hesapla */
+    size_t total_weights = 0;
+    size_t total_biases  = 0;
+    for (uint8_t i = 1; i < topo.layer_count; i++) {
+        size_t w = (size_t)topo.layer_sizes[i] * topo.layer_sizes[i - 1];
+        if (total_weights + w < total_weights) {  /* taşma kontrolü */
+            errno = EOVERFLOW;
+            goto fail;
+        }
+        total_weights += w;
+        total_biases  += topo.layer_sizes[i];
     }
-    
-    if (net->topology.layer_count > 1) {
-        if (fread(net->weight_offsets, sizeof(size_t),
-                  net->topology.layer_count - 1, fp) !=
-            (size_t)(net->topology.layer_count - 1)) {
-            network_free(net);
-            fclose(fp); return false;
+
+    /* Global üst sınırlar */
+    if (total_neurons > NET_MAX_TOTAL_NEURONS ||
+        total_weights > NET_MAX_TOTAL_WEIGHTS ||
+        total_biases  > NET_MAX_TOTAL_BIASES) {
+        errno = EFBIG;
+        goto fail;
+    }
+
+    /* ---- 3. Dosyadaki sayılar bizim hesabımızla uyuşuyor mu? ---- */
+    size_t f_neurons = 0, f_weights = 0, f_biases = 0;
+    if (fread(&f_neurons, sizeof(size_t), 1, fp) != 1) goto fail;
+    if (fread(&f_weights, sizeof(size_t), 1, fp) != 1) goto fail;
+    if (fread(&f_biases,  sizeof(size_t), 1, fp) != 1) goto fail;
+
+    if (f_neurons != total_neurons ||
+        f_weights != total_weights ||
+        f_biases  != total_biases) {
+        errno = EINVAL;
+        goto fail;
+    }
+
+    /* ---- 4. Offset tablolarını GEÇİCİ dizilere oku ---- */
+    size_t layer_offsets [MAX_LAYERS];
+    size_t weight_offsets[MAX_LAYERS];
+    size_t bias_offsets  [MAX_LAYERS];
+
+    if (fread(layer_offsets, sizeof(size_t),
+              topo.layer_count, fp) != topo.layer_count) goto fail;
+
+    if (topo.layer_count > 1) {
+        if (fread(weight_offsets, sizeof(size_t),
+                  topo.layer_count - 1, fp) !=
+            (size_t)(topo.layer_count - 1)) goto fail;
+    }
+
+    if (fread(bias_offsets, sizeof(size_t),
+              topo.layer_count, fp) != topo.layer_count) goto fail;
+
+    /* Offset'lerin monotonik olduğunu doğrula (defansif) */
+    for (uint8_t i = 1; i < topo.layer_count; i++) {
+        if (layer_offsets[i] <= layer_offsets[i - 1] ||
+            bias_offsets[i]  <= bias_offsets[i - 1]) {
+            errno = EINVAL;
+            goto fail;
         }
     }
-    
-    if (fread(net->bias_offsets, sizeof(size_t),
-              net->topology.layer_count, fp) != net->topology.layer_count) {
-        network_free(net);
-        fclose(fp); return false;
+    if (layer_offsets[topo.layer_count - 1] + topo.layer_sizes[topo.layer_count - 1]
+            != total_neurons) {
+        errno = EINVAL;
+        goto fail;
     }
-    
-    /* Allocate memory */
-    net->memory_block_size = net->total_neurons * sizeof(float) +
-                             net->total_weights * sizeof(float) +
-                             net->total_biases * sizeof(float) +
-                             net->topology.input_size * sizeof(float) +
-                             net->topology.output_size * sizeof(float);
-    
-    net->memory_block = aligned_malloc(net->memory_block_size, SIMD_ALIGNMENT);
-    if (!net->memory_block) {
-        fclose(fp); return false;
+
+    /* ---- 5. Arena boyutunu TAŞMA KONTROLLÜ hesapla ---- */
+    const size_t elem = sizeof(float);
+    if (total_neurons > SIZE_MAX / elem ||
+        total_weights > SIZE_MAX / elem ||
+        total_biases  > SIZE_MAX / elem) {
+        errno = EOVERFLOW;
+        goto fail;
     }
-    
-    /* Set up pointers */
-    char *ptr = net->memory_block;
-    net->voltages = (float *)ptr;
-    ptr += net->total_neurons * sizeof(float);
-    net->weights = (float *)ptr;
-    ptr += net->total_weights * sizeof(float);
-    net->biases = (float *)ptr;
-    ptr += net->total_biases * sizeof(float);
-    net->input_buffer = (float *)ptr;
-    ptr += net->topology.input_size * sizeof(float);
-    net->output_buffer = (float *)ptr;
-    
-    /* Read data arrays */
-    if (fread(net->voltages, sizeof(float), net->total_neurons, fp) !=
-        net->total_neurons) {
-        network_free(net);
-        fclose(fp); return false;
+
+    size_t mem_size =
+        total_neurons * elem +
+        total_weights * elem +
+        total_biases  * elem +
+        (size_t)topo.input_size  * elem +
+        (size_t)topo.output_size * elem;
+
+    block = aligned_malloc(mem_size, SIMD_ALIGNMENT);
+    if (!block) {
+        errno = ENOMEM;
+        goto fail;
     }
-    
-    if (fread(net->weights, sizeof(float), net->total_weights, fp) !=
-        net->total_weights) {
-        network_free(net);
-        fclose(fp); return false;
+
+    /* Geçici işaretçiler */
+    char  *p     = (char *)block;
+    float *volt  = (float *)p; p += total_neurons * elem;
+    float *wts   = (float *)p; p += total_weights * elem;
+    float *bs    = (float *)p; p += total_biases  * elem;
+    float *inb   = (float *)p; p += (size_t)topo.input_size  * elem;
+    float *outb  = (float *)p;
+
+    /* ---- 6. Veri dizilerini oku ---- */
+    if (fread(volt, elem, total_neurons, fp) != total_neurons) goto fail_block;
+    if (fread(wts,  elem, total_weights, fp) != total_weights) goto fail_block;
+    if (fread(bs,   elem, total_biases,  fp) != total_biases ) goto fail_block;
+
+    /* ---- 7. Sonda çöp var mı? ---- */
+    if (fgetc(fp) != EOF) {
+        errno = EINVAL;
+        goto fail_block;
     }
-    
-    if (fread(net->biases, sizeof(float), net->total_biases, fp) !=
-        net->total_biases) {
-        network_free(net);
-        fclose(fp); return false;
-    }
-    
+
     fclose(fp);
-    
-    /* Mark as initialized */
-    net->initialized = true;
-    net->needs_reset = false;
+    fp = NULL;
+
+    if (net->initialized && net->memory_block) {
+        aligned_free(net->memory_block);
+    }
+
+    net->topology       = topo;
+    net->total_neurons  = total_neurons;
+    net->total_weights  = total_weights;
+    net->total_biases   = total_biases;
+
+    memcpy(net->layer_offsets,  layer_offsets,  sizeof(layer_offsets));
+    memcpy(net->weight_offsets, weight_offsets, sizeof(weight_offsets));
+    memcpy(net->bias_offsets,   bias_offsets,   sizeof(bias_offsets));
+
+    net->memory_block      = block;
+    net->memory_block_size = mem_size;
+    net->voltages          = volt;
+    net->weights           = wts;
+    net->biases            = bs;
+    net->input_buffer      = inb;
+    net->output_buffer     = outb;
+
+    net->initialized        = true;
+    net->needs_reset        = false;
     net->forward_pass_count = 0;
     net->neuron_activations = 0;
-    
+
     return true;
+
+fail_block:
+    aligned_free(block);
+fail:
+    if (fp) fclose(fp);
+    return false;
 }
