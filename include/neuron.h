@@ -1,8 +1,9 @@
 /*
  * neuron.h - Neural Network Definitions for LLM Translator
  *
+ * SPDX-License-Identifier: GPL-3.0-or-later
  * Copyright (C) 2026  GNU AI Project
- * Author: Claire <claire@gnu-ai.org>
+ * Author: Claire Ivanenka <claire@gnu-ai.org>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -1,6 +1,12 @@
 # Makefile for LLM Sigmoid Neuron Translator - GNU Hurd
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 GNU AI Project
-# Author: Claire <claire@gnu-ai.org>
+# Author: Claire Ivanenka <claire@gnu-ai.org>
+#
+# This Makefile is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
 # This Makefile compiles the translator source files.
 # - On any system: 'make' or 'make compile' compiles object files (C23/POSIX compliant)
@@ -93,19 +99,6 @@ uninstall:
 
 clean:
 	rm -f $(TARGET) $(OBJS) *~ *.o
-
-# Minimal test translator - for debugging
-minimal: src/translator-minimal.o
-
-src/translator-minimal.o: src/translator-minimal.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
-
-minimal-translator: src/translator-minimal.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-install-minimal: minimal-translator
-	install -m 755 minimal-translator /hurd/
-	@echo "Minimal translator installed to /hurd/minimal-translator"
 
 help:
 	@echo "LLM Sigmoid Neuron Translator for GNU Hurd - Modular Version"

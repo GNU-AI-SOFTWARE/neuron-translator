@@ -1,3 +1,13 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-or-later
+Copyright (C) 2026 Claire Ivanenka <claire@gnu-ai.org>
+
+This file is part of the Sigmoid Neuron Translator and is free software:
+you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation,
+either version 3 of the License, or (at your option) any later version.
+-->
+
 # Sigmoid Neuron Translator for GNU Hurd
 
 A **memory-efficient, CPU-optimized** sigmoid neuron translator for GNU Hurd, specifically designed to handle **large numbers of neurons** (100K+) with **minimal memory footprint** and **low CPU usage**. This implementation follows the **Claude Delannoy** style with extensive English comments.
