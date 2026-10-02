@@ -35,6 +35,18 @@
  *  Neural network parameters and limits for memory-efficient implementation  *
  *                                                                           *
  *****************************************************************************/
+/* --- Model file format --- */
+/* Every .nn file starts with a magic number and a format version, so
+ * network_load() can reject files it does not know how to read. */
+#define NET_FILE_MAGIC     0x4E455552u   /* 'N' 'E' 'U' 'R' */
+#define NET_FILE_VERSION   1u
+
+/* --- Safe upper limits (protection against fuzzed/malicious files) ---
+ * A model file is untrusted input: these ceilings bound how much memory
+ * a single load is allowed to request, whatever the file claims. */
+#define NET_MAX_TOTAL_NEURONS  (16u  * 1024u * 1024u)   /* 16M  */
+#define NET_MAX_TOTAL_WEIGHTS  (256u * 1024u * 1024u)   /* 256M */
+#define NET_MAX_TOTAL_BIASES   NET_MAX_TOTAL_NEURONS
 
 /** Maximum number of layers in the neural network */
 #define MAX_LAYERS 8

@@ -33,40 +33,74 @@
 #include <hurd/trivfs.h>
 #include <hurd/fsys.h>
 
+#include <argp.h>
 #include <error.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/* trivfs requirement: the control structure filled in by trivfs_startup(),
+ * which holds the port buckets libtrivfs serves our RPCs through. */
+struct trivfs_control *fsys;
+
+const char *argp_program_version = "sigmoid-neuron-0.1";
+const char *argp_program_bug_address = "<claire@gnu-ai.org>";
+static char doc[] = "GNU/Hurd sigmoid neuron translator.";
+
+/* Command-line options accepted by the translator */
+static struct argp_option options[] = {
+  {"bias", 'b', "FLOAT", 0, "Initial bias value for the neuron", 0},
+  { 0 }
+};
+
+/* Initial neuron parameter, set by the --bias option */
+float global_bias = 0.0f;
+
+static error_t
+parse_opt (int key, char *arg, struct argp_state *state)
+{
+  (void) state;                 /* Unused: no ARGP_KEY_ handling needs it */
+
+  switch (key)
+    {
+    case 'b':
+      global_bias = atof (arg);
+      break;
+    case ARGP_KEY_SUCCESS:
+      break;
+    default:
+      return ARGP_ERR_UNKNOWN;
+    }
+  return 0;
+}
+
+static struct argp argp = { options, parse_opt, 0, doc, 0, 0, 0 };
 
 int
 main (int argc, char *argv[])
 {
-    error_t err;
-    mach_port_t bootstrap;
-    struct trivfs_control *fsys;
+  error_t err;
+  mach_port_t bootstrap;
 
-    /* We currently accept no command line options. */
-    (void) argc;
-    (void) argv;
+  /* Parse the command line: settrans passes any arguments that follow
+     the translator path on to us. */
+  argp_parse (&argp, argc, argv, 0, 0, 0);
 
-    /* settrans gives us a bootstrap port to reply on.  Without one we
-     * have not been started as a translator. */
-    task_get_bootstrap_port (mach_task_self (), &bootstrap);
-    if (bootstrap == MACH_PORT_NULL)
-        error (1, 0, "Must be started as a translator");
+  /* Get the bootstrap port that the parent (settrans) handed us */
+  task_get_bootstrap_port (mach_task_self (), &bootstrap);
+  if (bootstrap == MACH_PORT_NULL)
+    error (1, 0, "Must be started as a translator");
 
-    /* Reply to our parent (settrans).  Passing zeros lets libtrivfs
-     * create the port classes and buckets it needs. */
-    err = trivfs_startup (bootstrap, 0, 0, 0, 0, 0, &fsys);
-    mach_port_deallocate (mach_task_self (), bootstrap);
-    if (err)
-        error (3, err, "Contacting parent");
+  /* Start the trivfs server: this replies to settrans, telling it the
+     translator is up, and returns our control port in FSYS. */
+  err = trivfs_startup (bootstrap, 0, 0, 0, 0, 0, &fsys);
+  mach_port_deallocate (mach_task_self (), bootstrap);
+  if (err)
+    error (3, err, "Contacting parent failed");
 
-    /* Serve RPCs until we are killed or asked to go away.  Timeout 0
-     * means the loop never returns.  All messages are demultiplexed by
-     * libtrivfs's trivfs_demuxer, which calls the trivfs_S_*
-     * functions in trivfs-hooks.c.  A single thread serializes access
-     * to the global neural network state. */
-    ports_manage_port_operations_one_thread (fsys->pi.bucket,
-                                              trivfs_demuxer, 0);
+  /* Enter the server loop: receive incoming RPCs forever and let
+     trivfs_demuxer dispatch them to our trivfs_S_* hooks. */
+  ports_manage_port_operations_one_thread (fsys->pi.bucket,
+                                            trivfs_demuxer, 0);
 
-    return 0;
+  return 0;
 }
