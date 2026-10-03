@@ -71,6 +71,22 @@ compile: $(OBJS)
 # Executable target - only works on Hurd systems with libraries
 executable: $(TARGET)
 
+# --- Unit tests ----------------------------------------------------------
+# The neuron core (src/neuron.c) is pure POSIX C, so the test suite
+# builds and runs on any system: Linux development box or GNU/Hurd.
+# 'make check' is the standard GNU target used by the acceptance
+# criteria of the pile's PLAN.md documents.
+TEST_BIN = tests/test_neuron
+TEST_SRCS = tests/test_neuron.c
+
+check: src/neuron.o $(TEST_BIN)
+	./$(TEST_BIN)
+
+$(TEST_BIN): $(TEST_SRCS) src/neuron.o
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_SRCS) src/neuron.o -lm
+
+# -------------------------------------------------------------------------
+
 # Libraries must come AFTER the objects: ld scans archives in order,
 # so -ltrivfs before the .o files would pull nothing (undefined refs)
 $(TARGET): $(OBJS)
@@ -98,7 +114,7 @@ uninstall:
 	@echo "Removed from $(INSTALL_DIR)/"
 
 clean:
-	rm -f $(TARGET) $(OBJS) *~ *.o
+	rm -f $(TARGET) $(OBJS) $(TEST_BIN) *~ *.o
 
 help:
 	@echo "LLM Sigmoid Neuron Translator for GNU Hurd - Modular Version"
@@ -106,6 +122,7 @@ help:
 	@echo "Build targets:"
 	@echo "  make          - Build the translator (requires Hurd libraries)"
 	@echo "  make compile  - Compile only (no linking, for Debian/Linux)"
+	@echo "  make check    - Build and run the unit tests (any system)"
 	@echo "  make install  - Install to /hurd/"
 	@echo "  make uninstall - Remove from /hurd/"
 	@echo "  make clean    - Clean build artifacts"
@@ -113,4 +130,4 @@ help:
 	@echo "Note: Full build with linking requires GNU/Hurd system or"
 	@echo "      Hurd development libraries. On Debian/Linux, use 'make compile'."
 
-.PHONY: all install uninstall clean help compile
+.PHONY: all install uninstall clean help compile check
