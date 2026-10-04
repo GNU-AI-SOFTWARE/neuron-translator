@@ -30,7 +30,7 @@ A **memory-efficient, CPU-optimized** sigmoid neuron translator for GNU Hurd, sp
 
 ### Neuron Model
 - **Sigmoid activation**: $f(x) = 1 / (1 + exp(-x))$
-- **Feedforward network**: Input -> Hidden Layer(s) -> Output
+- **Feedforward network**: $Input \rightarrow Hidden Layer(s) \rightarrow Output$
 - **Contiguous memory layout**: All data in single block
 - **Low overhead**: Designed for thousands of neurons
 
