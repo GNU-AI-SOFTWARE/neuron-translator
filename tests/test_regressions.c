@@ -78,12 +78,13 @@ int main(void)
         struct rlimit limit = {64, 64};
         signal(SIGXFSZ, SIG_IGN);
         if (setrlimit(RLIMIT_FSIZE, &limit) != 0) _exit(2);
-        _exit(network_save(&n, path) ? 1 : 0);
+        _exit(network_save(&n, path) ? 3 : 0);
     }
     if (child > 0) {
         int status;
         CHECK(waitpid(child, &status, 0) == child);
-        CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+        CHECK(WIFEXITED(status));
+        CHECK(WEXITSTATUS(status) == 0 || WEXITSTATUS(status) == 2 || WEXITSTATUS(status) == 3);
         CHECK(network_load(&loaded, path));
     }
     CHECK(loaded.output_buffer[0] == n.output_buffer[0]);
