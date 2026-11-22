@@ -82,7 +82,7 @@ mach_port_t trivfs_control = MACH_PORT_NULL;
 #include <hurd/trivfs.h>
 #include <hurd/fsys.h>
 #include <hurd/hurd_types.h>
-#include <hurd/idvec.h>
+#include <idvec.h>
 
 /*****************************************************************************
  *  TRIVFS VARIABLES
