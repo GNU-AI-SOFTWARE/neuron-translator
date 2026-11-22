@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # release.sh — cut a release: bump VERSION, stamp CHANGELOG.md, commit,
 # tag vX.Y.Z (immutable). Whole-org stack release with --all.
+# 'iterate' = iterative versioning: one automatic patch bump per
+# iteration (0.1.0 -> 0.1.1 -> 0.1.2 ...).
 # Usage:
-#   scripts/release.sh patch|minor|major|X.Y.Z
+#   scripts/release.sh patch|minor|major|iterate|X.Y.Z
 #   scripts/release.sh X.Y.Z --all /path/to/org-checkouts
 set -eu
-usage() { echo "usage: $0 patch|minor|major|X.Y.Z [--all DIR]" >&2; exit 2; }
+usage() { echo "usage: $0 patch|minor|major|iterate|X.Y.Z [--all DIR]" >&2; exit 2; }
 [ $# -ge 1 ] || usage
 KIND=$1
 ALL=""
@@ -18,7 +20,7 @@ bump() {  # $1=current X.Y.Z  $2=kind -> prints the new version
   case $k in
     major) echo "$((maj+1)).0.0" ;;
     minor) echo "$maj.$((min+1)).0" ;;
-    patch) echo "$maj.$min.$((pat+1))" ;;
+    patch|iterate) echo "$maj.$min.$((pat+1))" ;;
     *) echo "$k" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' && echo "$k" \
          || { echo "release: bad version/kind '$k'" >&2; exit 2; } ;;
   esac
@@ -35,9 +37,9 @@ release_one() {
   if [ -f CHANGELOG.md ]; then
     today=$(date +%F)
     awk -v hdr="## [$NEW] — $today" '
-      /^## \[Unreleased\]/ && !done {
-        print hdr; print ""; print "## [Unreleased]"; done=1; next
-      }
+      /^## \[[0-9]+\.[0-9]+\.[0-9]+\]/ { rel=1 }
+      /^## \[[0-9]+\.[0-9]+\.[0-9]+\]/ && !done { print hdr; print ""; done=1 }
+      !done && !rel && /^## \[Unreleased\]/ { print hdr; print ""; done=1 }
       { print }
       END { if (!done) { print ""; print hdr } }
     ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
