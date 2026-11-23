@@ -89,3 +89,5 @@ src/sigmoid-neuron-translator
 # Test artifacts
 tests/test_model
 test-model.nn
+
+/tests/test_regressions
