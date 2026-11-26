@@ -118,7 +118,9 @@ what the code does with them:
   `save <file>` command of another instance, or by an **external
   trainer** that emits the documented format (see *The .nn model
   format* below). A reference trainer is provided as
-  [`scripts/train_nn.py`](scripts/train_nn.py) — it trains a small
+  [`scripts/train_nn.py`](scripts/train_nn.py) (with
+  [`scripts/jsonl_to_nn_data.py`](scripts/jsonl_to_nn_data.py) to
+  vectorize text JSONL first) — it trains a small
   dense sigmoid MLP on JSONL `{"input":…, "output":…}` vectors and
   writes the `.nn` v2 layout directly (see *Producing a .nn file*
   below). Training remains a separate concern of the stack: the
@@ -265,6 +267,15 @@ loadable `.nn` v2 file:
 # data.jsonl: one {"input": [..], "output": [..]} per line
 python3 scripts/train_nn.py --data data.jsonl --topology 2,8,1 \
     --epochs 500 --lr 0.5 --out model.nn
+
+# text data first? convert it to vector JSONL with the companion tool:
+#   input:  {"conversations": [{"from": "human", ...}, {"from": "gpt", ...}]}
+#           or {"question": ..., "answer": ...} or {"text": ...} per line
+#   output: {"input": [..], "output": [..]} per line
+python3 scripts/jsonl_to_nn_data.py --in conversations.jsonl \
+    --out data.jsonl --dim 16 --out-dim 4
+python3 scripts/train_nn.py --data data.jsonl --topology 16,32,4 \
+    --epochs 200 --out model.nn
 
 # in the VM (or on any host), load it into the translator:
 echo 'topology 2,8,1' > /llm1
