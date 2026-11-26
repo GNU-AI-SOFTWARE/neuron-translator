@@ -117,11 +117,14 @@ what the code does with them:
   `load <file>` command. A `.nn` file is produced either by the
   `save <file>` command of another instance, or by an **external
   trainer** that emits the documented format (see *The .nn model
-  format* below). No trainer lives in this repository by design:
-  training is a separate concern of the stack (the orchestrator
-  archives training data through data-base-translator; the component
-  that consumes it to produce `.nn` files is specified there, not
-  here).
+  format* below). A reference trainer is provided as
+  [`scripts/train_nn.py`](scripts/train_nn.py) (with
+  [`scripts/jsonl_to_nn_data.py`](scripts/jsonl_to_nn_data.py) to
+  vectorize text JSONL first) — it trains a small
+  dense sigmoid MLP on JSONL `{"input":…, "output":…}` vectors and
+  writes the `.nn` v2 layout directly (see *Producing a .nn file*
+  below). Training remains a separate concern of the stack: the
+  orchestrator archives training data through data-base-translator.
 
 If the stack is mounted and driven without loading weights, the
 compute claim is limited to "the plumbing works": every translator
@@ -253,6 +256,41 @@ Key rules, enforced by `network_load()`:
   a row-major `layer_sizes[i] * layer_sizes[i-1]` block, immediately
   followed by the next layer's block; the bias vector of layer `i`
   has `layer_sizes[i]` entries.
+
+### Producing a .nn file
+
+`scripts/train_nn.py` (pure Python standard library, no dependencies)
+trains a small dense sigmoid network on vector data and writes a
+loadable `.nn` v2 file:
+
+```bash
+# data.jsonl: one {"input": [..], "output": [..]} per line
+python3 scripts/train_nn.py --data data.jsonl --topology 2,8,1 \
+    --epochs 500 --lr 0.5 --out model.nn
+
+# text data first? convert it to vector JSONL with the companion tool:
+#   input:  {"conversations": [{"from": "human", ...}, {"from": "gpt", ...}]}
+#           or {"question": ..., "answer": ...} or {"text": ...} per line
+#   output: {"input": [..], "output": [..]} per line
+python3 scripts/jsonl_to_nn_data.py --in conversations.jsonl \
+    --out data.jsonl --dim 16 --out-dim 4
+python3 scripts/train_nn.py --data data.jsonl --topology 16,32,4 \
+    --epochs 200 --out model.nn
+
+# in the VM (or on any host), load it into the translator:
+echo 'topology 2,8,1' > /llm1
+echo 'load /path/to/model.nn' > /llm1
+echo 'input 0.9,0.9' > /llm1
+cat /llm1
+```
+
+Without `--topology`, input/output sizes are taken from the first
+record and a single hidden layer is used. The script self-checks by
+parsing the written file back and running one sample through it.
+Note the format is a dense feedforward MLP: a transformer LLM does not
+fit it — use the trainer for small vector models; large models are
+served through the stack's retrieval path (`/db` + `/reply` in
+inference-translator).
 
 ### Example Session
 
