@@ -13,12 +13,18 @@ TESTS = test_cli.sh $(check_PROGRAMS)
 
 EXTRA_DIST = test_cli.sh
 
-check_PROGRAMS = test_model test_regressions
+check_PROGRAMS = test_model test_regressions test_llm
 
 # neuron.c is the whole compute core; the test drives it directly,
 # the way an external trainer would drive the .nn contract.
 test_model_SOURCES = test_model.c $(top_srcdir)/src/neuron.c
 test_model_LDADD = -lm
+# commands.c routes the gen/train/llm node commands to llm-cmd.c.
 test_regressions_SOURCES = test_regressions.c $(top_srcdir)/src/neuron.c \
-                          $(top_srcdir)/src/commands.c
+                          $(top_srcdir)/src/commands.c \
+                          $(top_srcdir)/src/llm.c \
+                          $(top_srcdir)/src/llm-cmd.c
 test_regressions_LDADD = -lm
+# The generative LLM core (llm.c) is pure C23/POSIX + libm as well.
+test_llm_SOURCES = test_llm.c $(top_srcdir)/src/llm.c
+test_llm_LDADD = -lm
