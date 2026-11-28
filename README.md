@@ -208,6 +208,34 @@ the translator owner's UID or root, because paths resolve with the server's
 credentials. Other writers can operate the shared network but cannot use its
 filesystem privileges.
 
+### Generative LLM (mini transformer)
+
+Alongside the sigmoid network, the node embeds a small but real
+autoregressive language model (`src/llm.c`): byte-level tokenizer,
+token + position embeddings, causal multi-head self-attention blocks
+with RMSNorm, a vocabulary head, and SGD training by full manual
+backpropagation. Four commands drive it on the `/llm` node:
+
+```bash
+# SGD training on a text corpus (loss printed on the console log)
+echo 'train /root/corpus.txt' | sudo tee /llm
+
+# Autoregressive generation from a prompt (shown by `cat /llm`)
+echo 'gen bonjour le monde' | sudo tee /llm
+
+# Persist / reload the generative model (.llm format, magic 'LLM1')
+echo 'llm save /tmp/model.llm' | sudo tee /llm
+echo 'llm load /tmp/model.llm' | sudo tee /llm
+```
+
+The same model is drivable from any host through the verification
+binary:
+
+```bash
+sigmoid-neuron-translator --gen "bonjour" --train corpus.txt \
+    --steps 800 --tokens 24 --temp 0     # temp 0 = argmax
+```
+
 ### The .nn Model Format (v2)
 
 The format is the contract between this translator and any external

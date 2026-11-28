@@ -16,6 +16,8 @@ endif
 # les cas ; seule la boucle principale change (voir configure.ac).
 CORE_SOURCES = \
     neuron.c \
+    llm.c \
+    llm-cmd.c \
     commands.c \
     trivfs-hooks.c
 

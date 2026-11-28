@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "commands.h"
+#include "llm-cmd.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -25,6 +26,17 @@ int network_command(CompactNeuralNetwork *net, const char *data, size_t length)
     while (*p == ' ' || *p == '\t') p++;
     int error = EINVAL;
     if (!*p || strchr(p, '\n') || strchr(p, '\r')) goto done;
+
+    /* Generative LLM commands are routed to the llm core; they are
+     * orthogonal to the sigmoid network commands below. */
+    if (!strncmp(p, "gen ", 4) || !strncmp(p, "train ", 6)
+        || !strncmp(p, "llm ", 4)) {
+        char *note = NULL;
+        size_t note_len = 0;
+        error = llm_node_command(p, &note, &note_len);
+        free(note);
+        goto done;
+    }
 
     if (!strcmp(p, "reset")) {
         if (!net->initialized) goto done;
@@ -106,11 +118,16 @@ int network_status(const CompactNeuralNetwork *net, char **text, size_t *length)
         net->total_weights, (double)net->topology.reset_potential);
     for (size_t i = 0; i < net->topology.output_size; i++)
         ADD("  [%zu]: %.6f\n", i, (double)net->output_buffer[i]);
-    ADD("\nStatistics:\n  Forward Passes: %zu\n  Neuron Activations: %zu\n\n"
-        "Commands (one complete command per write):\n"
+    ADD("\nStatistics:\n  Forward Passes: %zu\n  Neuron Activations: %zu\n",
+        net->forward_pass_count, net->neuron_activations);
+    const char *gen = llm_last_output();
+    if (gen && *gen)
+        ADD("\nLLM generation (last):\n  %s\n", gen);
+    ADD("\nCommands (one complete command per write):\n"
         "  topology 10,20,5\n  input v1,...,v%u\n"
-        "  reset\n  save /path/model.nn\n  load /path/model.nn\n",
-        net->forward_pass_count, net->neuron_activations,
+        "  reset\n  save /path/model.nn\n  load /path/model.nn\n"
+        "  gen <prompt>\n  train /path/corpus.txt\n"
+        "  llm save /path/model.llm\n  llm load /path/model.llm\n",
         (unsigned)net->topology.input_size);
 #undef ADD
     *text = buffer;
