@@ -56,8 +56,12 @@
 /** Maximum number of layers in the neural network */
 #define MAX_LAYERS 8
 
-/** Maximum number of neurons per layer */
-#define MAX_NEURONS_PER_LAYER 8192
+/** Maximum number of neurons per layer: layer_sizes[] is uint16_t,
+ *  so 65535 is the hard storage ceiling (larger values must be
+ *  refused with EINVAL, never silently wrapped).  Million-neuron
+ *  systems are built as ensembles of instances (see orchestrator);
+ *  the NET_MAX_TOTAL_* ceilings above still bound each network. */
+#define MAX_NEURONS_PER_LAYER 65535u
 
 /** SIMD alignment for memory allocation */
 #define SIMD_ALIGNMENT 16
