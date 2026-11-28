@@ -181,6 +181,25 @@ externe, `make check`), portage C23/POSIX.1-2008 vérifié, build et
 tests de bout en bout dans le sandbox QEMU de
 [mistral-vm-debian-hurd](https://github.com/gnu-ai/mistral-vm-debian-hurd).
 
+### Phase 4 — Le neurone comme LLM : réponses textuelles ancrées (en cours)
+
+- Entrée textuelle : la même vectorisation `inf_text_to_vector`
+  qu'`inference-translator` est écrivable dans `/llm<N>/input` ; la
+  section `Output:` lue en retour est la réponse du LLM, décodable par
+  `inf_vector_to_text`.
+- Modèle appris : `.nn` v2 entraîné depuis `/db/training_data`
+  (`scripts/train-from-db.py` d'`inference-translator`, backprop sur
+  les paires question→réponse), chargé par
+  `echo 'load model.nn' | tee /llm1` ; chaque version du modèle est
+  historisée côté orchestrateur (table `models`).
+- **Livrable** : neurone répondant en texte à un prompt, modèle `.nn`
+  versionné.
+- **Acceptation** : dans la VM Hurd, `/reply <question>` du client
+  `inference` reçoit la sortie du neurone, ancrée sur `/db`
+  (`sources` citant `source_url` + checksum).
+- **Dépend de** : v1.0 (terminée) + data-base phase 3 (`training_data`
+  servie) + inference phases 9–10.
+
 État courant (octobre 2026) : **v1.0, terminé** — `src` + `tests`.
 Ce dépôt n'a plus de chantier ouvert : il sert de contrat de calcul
 stable au reste de la pile ; la suite (plus gros modèles, GPU) se
@@ -195,6 +214,7 @@ joue côté système (voir le `WIP.md` de
 | 1 | MVP : translator, arena, forward pass | 0 | terminée |
 | 2 | `save`/`load`/`reset`, format v2, tests de persistance | 1 | terminée |
 | 3 | Durcissement, harnais de tests, v1.0, CI Hurd | 1, 2 | terminée |
+| 4 | Réponses textuelles ancrées, `.nn` appris depuis `/db` | 3 + data-base 3 | en cours |
 
 Ce translator est la brique la plus basse de la pile : tout ce qui
 est au-dessus (orchestrateur, agrégation, votes) suppose que ce
